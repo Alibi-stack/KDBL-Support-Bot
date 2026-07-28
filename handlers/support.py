@@ -153,10 +153,7 @@ async def close_ticket_callback(callback: CallbackQuery) -> None:
         await callback.answer("Тикет не найден", show_alert=True)
         return
 
-    await callback.message.edit_text(
-        mark_ticket_closed(callback.message.text or ""),
-        reply_markup=None,
-    )
+    await mark_callback_message_closed(callback)
     await callback.message.answer(f"Тикет #{ticket.id} закрыт.")
     await callback.bot.send_message(
         ticket.user_id,
@@ -568,6 +565,34 @@ async def cleanup_general_ticket_message(
         f"Ticket #{ticket_id} открыт в отдельной ветке.",
         reply_markup=ticket_open_keyboard(ticket_id, topic_url),
     )
+
+
+async def mark_callback_message_closed(callback: CallbackQuery) -> None:
+    message = callback.message
+    if message.text:
+        try:
+            await message.edit_text(
+                mark_ticket_closed(message.text),
+                reply_markup=None,
+            )
+            return
+        except TelegramBadRequest:
+            logger.exception("Cannot edit closed ticket text")
+
+    if message.caption:
+        try:
+            await message.edit_caption(
+                caption=mark_ticket_closed(message.caption)[:1024],
+                reply_markup=None,
+            )
+            return
+        except TelegramBadRequest:
+            logger.exception("Cannot edit closed ticket caption")
+
+    try:
+        await message.edit_reply_markup(reply_markup=None)
+    except TelegramBadRequest:
+        logger.exception("Cannot remove closed ticket keyboard")
 
 
 async def ensure_ticket_topic(callback: CallbackQuery, ticket) -> object | None:
