@@ -21,19 +21,7 @@ def main_menu_keyboard() -> InlineKeyboardMarkup:
                     callback_data="ask_ai",
                 )
             ],
-            [
-                InlineKeyboardButton(
-                    text="Справочник номеров",
-                    callback_data="phonebook",
-                )
-            ],
             [InlineKeyboardButton(text="FAQ", callback_data="faq")],
-            [
-                InlineKeyboardButton(
-                    text="Дежурный оператор",
-                    callback_data="duty_contact",
-                )
-            ],
             [
                 InlineKeyboardButton(
                     text="Сменить язык / Тілді ауыстыру",
@@ -44,17 +32,33 @@ def main_menu_keyboard() -> InlineKeyboardMarkup:
     )
 
 
-def after_ai_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
+def after_ai_keyboard(show_duty: bool = False) -> InlineKeyboardMarkup:
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                text="Создать тикет оператору",
+                callback_data="human_support",
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="Справочник номеров",
+                callback_data="phonebook",
+            )
+        ],
+    ]
+    if show_duty:
+        keyboard.append(
             [
                 InlineKeyboardButton(
-                    text="Создать тикет оператору",
-                    callback_data="human_support",
+                    text="Дежурный оператор",
+                    callback_data="duty_contact",
                 )
-            ],
-            [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")],
-        ]
+            ]
+        )
+    keyboard.append([InlineKeyboardButton(text="Главное меню", callback_data="main_menu")])
+    return InlineKeyboardMarkup(
+        inline_keyboard=keyboard
     )
 
 

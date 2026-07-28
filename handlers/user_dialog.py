@@ -10,6 +10,7 @@ from aiogram.types import CallbackQuery, Message, ReplyKeyboardRemove
 
 from keyboards.inline import after_ai_keyboard, main_menu_keyboard
 from keyboards.reply import cancel_keyboard
+from handlers.start import is_work_time
 from services.ai_client import AIServiceError, get_ai_response
 from services.i18n import get_message_language, pick
 from states.user_states import UserDialog
@@ -105,7 +106,7 @@ async def handle_ai_question(message: Message, state: FSMContext) -> None:
             "Келесі сұрақты бірден жаза аласыз. AI жауабы көмектеспесе, "
             "операторға тикет ашыңыз.",
         ),
-        reply_markup=after_ai_keyboard(),
+        reply_markup=after_ai_keyboard(show_duty=not is_work_time()),
     )
 
 

@@ -430,7 +430,7 @@ async def answer_with_rag(message: Message, state: FSMContext) -> None:
             "Жауап көмектеспесе, операторға тикет ашуға немесе мәзірге оралуға "
             "болады.",
         ),
-        reply_markup=after_ai_keyboard(),
+        reply_markup=after_ai_keyboard(show_duty=not is_work_time()),
     )
 
 
