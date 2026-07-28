@@ -20,7 +20,7 @@ async def main() -> None:
     settings = get_settings()
     await init_db()
 
-    session = AiohttpSession(timeout=15)
+    session = AiohttpSession(timeout=45)
     bot = Bot(token=settings.bot_token, session=session)
     dispatcher = Dispatcher(storage=MemoryStorage())
     dispatcher.include_router(setup_routers())
@@ -28,7 +28,7 @@ async def main() -> None:
     while True:
         try:
             logging.info("Checking Telegram connection...")
-            me = await asyncio.wait_for(bot.get_me(), timeout=20)
+            me = await asyncio.wait_for(bot.get_me(), timeout=60)
             logging.info("Telegram connection OK: @%s", me.username)
             await dispatcher.start_polling(bot)
         except (TelegramNetworkError, TimeoutError, asyncio.TimeoutError, OSError):
