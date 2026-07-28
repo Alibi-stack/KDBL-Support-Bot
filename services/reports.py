@@ -77,9 +77,9 @@ async def build_daily_ticket_report(report_date: date) -> Path:
             "Question",
             "Status",
             "Operator",
-            "Created UTC",
-            "Updated UTC",
-            "Closed UTC",
+            "Created",
+            "Updated",
+            "Closed",
         ]
     )
     for ticket in tickets:
@@ -92,9 +92,9 @@ async def build_daily_ticket_report(report_date: date) -> Path:
                 ticket.question,
                 ticket.status,
                 ticket.operator_name or "",
-                ticket.created_at,
-                ticket.updated_at,
-                ticket.closed_at or "",
+                format_report_datetime(ticket.created_at, tz),
+                format_report_datetime(ticket.updated_at, tz),
+                format_report_datetime(ticket.closed_at, tz),
             ]
         )
 
@@ -120,3 +120,15 @@ async def build_daily_ticket_report(report_date: date) -> Path:
     report_path = report_dir / f"tickets_{report_date.isoformat()}.xlsx"
     workbook.save(report_path)
     return report_path
+
+
+def format_report_datetime(value: str | None, tz: ZoneInfo) -> str:
+    if not value:
+        return ""
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        return value
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(tz).strftime("%d.%m.%Y %H:%M")
