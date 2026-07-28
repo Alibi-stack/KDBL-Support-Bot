@@ -537,10 +537,6 @@ async def create_support_ticket(
         f"#{ticket.id} өтініші құрылды. Оператор осы чатта жауап береді.",
         reply_markup=ReplyKeyboardRemove(),
     )
-    await message.answer(
-        "Главное меню / Басты мәзір",
-        reply_markup=main_menu_keyboard(),
-    )
 
 
 async def handle_operator_message(message: Message, ticket_id: int) -> None:
