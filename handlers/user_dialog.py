@@ -69,19 +69,28 @@ async def handle_ai_question(message: Message, state: FSMContext) -> None:
         await processing_message.edit_text(AI_UNAVAILABLE_TEXT)
         return
 
-    await state.clear()
-
     if answer.strip().startswith("NEED_HUMAN"):
         clean_answer = answer.split(":", 1)[-1].strip()
-        await processing_message.edit_text(
-            clean_answer
-            or (
-                "Для этого вопроса лучше подключить оператора.\n"
-                "Бұл сұраққа операторды қосқан дұрыс."
-            ),
-            reply_markup=human_support_keyboard(),
-        )
+        try:
+            await processing_message.edit_text(
+                clean_answer
+                or (
+                    "Для этого вопроса лучше подключить оператора.\n"
+                    "Бұл сұраққа операторды қосқан дұрыс."
+                ),
+                reply_markup=human_support_keyboard(),
+            )
+        except TelegramBadRequest:
+            await message.answer(
+                clean_answer
+                or (
+                    "Для этого вопроса лучше подключить оператора.\n"
+                    "Бұл сұраққа операторды қосқан дұрыс."
+                ),
+                reply_markup=human_support_keyboard(),
+            )
         await state.update_data(last_question=message.text)
+        await state.set_state(UserDialog.waiting_question)
         return
 
     chunks = split_long_message(answer)
@@ -94,9 +103,12 @@ async def handle_ai_question(message: Message, state: FSMContext) -> None:
         await message.answer(chunk)
 
     await state.update_data(last_question=message.text)
+    await state.set_state(UserDialog.waiting_question)
     await message.answer(
-        "Если ответ AI не помог, можно создать тикет оператору.\n"
-        "AI жауабы көмектеспесе, операторға тикет ашуға болады.",
+        "Можете сразу написать следующий вопрос. Если ответ AI не помог, "
+        "создайте тикет оператору.\n"
+        "Келесі сұрақты бірден жаза аласыз. AI жауабы көмектеспесе, "
+        "операторға тикет ашыңыз.",
         reply_markup=after_ai_keyboard(),
     )
 

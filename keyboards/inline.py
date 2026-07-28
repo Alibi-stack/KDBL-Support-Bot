@@ -24,12 +24,6 @@ def after_ai_keyboard() -> InlineKeyboardMarkup:
                     callback_data="human_support",
                 )
             ],
-            [
-                InlineKeyboardButton(
-                    text="Спросить AI еще раз",
-                    callback_data="ask_ai",
-                )
-            ],
             [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")],
         ]
     )
