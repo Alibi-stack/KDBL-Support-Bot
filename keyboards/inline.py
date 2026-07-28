@@ -21,13 +21,13 @@ def main_menu_keyboard() -> InlineKeyboardMarkup:
                     callback_data="ask_ai",
                 )
             ],
-            [InlineKeyboardButton(text="FAQ", callback_data="faq")],
             [
                 InlineKeyboardButton(
                     text="Справочник номеров",
                     callback_data="phonebook",
                 )
             ],
+            [InlineKeyboardButton(text="FAQ", callback_data="faq")],
             [
                 InlineKeyboardButton(
                     text="Дежурный оператор",
