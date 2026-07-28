@@ -21,6 +21,7 @@ rag_engine.py — поиск по базе знаний (RAG retrieval).
 
 import json
 import logging
+import re
 from functools import lru_cache
 
 from config import get_settings
@@ -31,6 +32,24 @@ EMBEDDING_MODEL_NAME = "paraphrase-multilingual-MiniLM-L12-v2"  # хорошо �
 COLLECTION_NAME = "faq"
 
 ESCALATION_TRIGGERS = ["оператор", "человек", "не помогло", "живой сотрудник", "поговорить с человеком"]
+SEARCH_STOPWORDS = {
+    "как",
+    "что",
+    "где",
+    "при",
+    "для",
+    "или",
+    "если",
+    "это",
+    "нет",
+    "работает",
+    "работать",
+    "проблема",
+    "проблемы",
+    "ошибка",
+    "нужно",
+    "можно",
+}
 
 
 def load_knowledge_base(path: str | None = None) -> list[dict]:
@@ -80,11 +99,66 @@ def _get_collection():
 
 def retrieve_relevant_faq(query: str, top_k: int = 3) -> list[dict]:
     """Возвращает top_k релевантных FAQ-статей целиком (с полным answer)."""
-    collection, kb_by_id = _get_collection()
-    query_embedding = _get_embedder().encode([query]).tolist()
-    results = collection.query(query_embeddings=query_embedding, n_results=top_k)
-    found_ids = results["ids"][0]
-    return [kb_by_id[i] for i in found_ids if i in kb_by_id]
+    lexical_matches = retrieve_relevant_faq_lexical(query, top_k=top_k)
+    if lexical_matches:
+        return lexical_matches
+
+    try:
+        collection, kb_by_id = _get_collection()
+        query_embedding = _get_embedder().encode([query]).tolist()
+        results = collection.query(
+            query_embeddings=query_embedding,
+            n_results=top_k,
+            include=["distances"],
+        )
+        found_ids = [
+            item_id
+            for item_id, distance in zip(results["ids"][0], results["distances"][0])
+            if distance <= 0.9
+        ]
+        return [kb_by_id[i] for i in found_ids if i in kb_by_id]
+    except Exception:
+        logger.exception("Векторный RAG недоступен, использую простой поиск по базе знаний")
+        return []
+
+
+def retrieve_relevant_faq_lexical(query: str, top_k: int = 3) -> list[dict]:
+    """Запасной поиск без ChromaDB и sentence-transformers.
+
+    Он нужен для первого запуска или нестабильного интернета, когда локальная
+    embedding-модель ещё не скачалась с HuggingFace.
+    """
+    query_tokens = set(_tokenize(query))
+    if not query_tokens:
+        return []
+
+    scored_items = []
+    for item in load_knowledge_base():
+        searchable = " ".join(
+            [
+                item.get("question", ""),
+                " ".join(item.get("keywords", [])),
+                item.get("category", ""),
+            ]
+        )
+        item_tokens = set(_tokenize(searchable))
+        score = len(query_tokens & item_tokens)
+        for keyword in item.get("keywords", []):
+            if keyword.lower() in query.lower():
+                score += 3
+        if score:
+            scored_items.append((score, item))
+
+    scored_items.sort(key=lambda pair: pair[0], reverse=True)
+    return [item for _, item in scored_items[:top_k]]
+
+
+def _tokenize(text: str) -> list[str]:
+    return [
+        token
+        for token in re.findall(r"[a-zа-яё0-9]+", text.lower())
+        if len(token) > 2 and token not in SEARCH_STOPWORDS
+    ]
 
 
 def format_context(faq_items: list[dict]) -> str:
