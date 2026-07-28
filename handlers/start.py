@@ -140,11 +140,15 @@ async def change_language(callback: CallbackQuery) -> None:
 async def show_phonebook(callback: CallbackQuery) -> None:
     language = await get_callback_language(callback)
     text = (
-        "Справочник номеров пока не заполнен. Когда вы дадите номера, я добавлю "
-        "их сюда."
+        "Справочник номеров операторов:\n\n"
+        "700 - Дархан\n"
+        "535 - Асхат (по Симбейс)\n"
+        "477 - Абылайхан (по Метадок)"
         if language == "ru"
-        else "Нөмірлер анықтамалығы әзірге толтырылмаған. Нөмірлерді бергенде, "
-        "осында қосамын."
+        else "Операторлар нөмірлерінің анықтамалығы:\n\n"
+        "700 - Дархан\n"
+        "535 - Асхат (Симбейс бойынша)\n"
+        "477 - Абылайхан (Метадок бойынша)"
     )
     await callback.message.edit_text(text, reply_markup=main_menu_keyboard())
     await callback.answer()
