@@ -41,12 +41,6 @@ def after_ai_keyboard(show_duty: bool = False) -> InlineKeyboardMarkup:
                     callback_data="duty_contact",
                 )
             ],
-            [
-                InlineKeyboardButton(
-                    text="Справочник номеров",
-                    callback_data="phonebook",
-                )
-            ],
         ]
     else:
         keyboard = [
@@ -56,17 +50,9 @@ def after_ai_keyboard(show_duty: bool = False) -> InlineKeyboardMarkup:
                     callback_data="human_support",
                 )
             ],
-            [
-                InlineKeyboardButton(
-                    text="Справочник номеров",
-                    callback_data="phonebook",
-                )
-            ],
         ]
     keyboard.append([InlineKeyboardButton(text="Главное меню", callback_data="main_menu")])
-    return InlineKeyboardMarkup(
-        inline_keyboard=keyboard
-    )
+    return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
 
 def back_to_menu_keyboard() -> InlineKeyboardMarkup:
@@ -98,6 +84,10 @@ def ticket_keyboard(ticket_id: int) -> InlineKeyboardMarkup:
                 InlineKeyboardButton(
                     text="Взять в работу",
                     callback_data=f"ticket_take:{ticket_id}",
+                ),
+                InlineKeyboardButton(
+                    text="Передать",
+                    callback_data=f"ticket_transfer:{ticket_id}",
                 ),
                 InlineKeyboardButton(
                     text="Закрыть",
@@ -172,6 +162,10 @@ def ticket_claim_keyboard(ticket_id: int) -> InlineKeyboardMarkup:
                     callback_data=f"ticket_take:{ticket_id}",
                 ),
                 InlineKeyboardButton(
+                    text="Передать",
+                    callback_data=f"ticket_transfer:{ticket_id}",
+                ),
+                InlineKeyboardButton(
                     text="Закрыть",
                     callback_data=f"ticket_close:{ticket_id}",
                 ),
@@ -217,3 +211,4 @@ def ticket_open_keyboard(ticket_id: int, topic_url: str | None) -> InlineKeyboar
         ]
     )
     return InlineKeyboardMarkup(inline_keyboard=buttons)
+
