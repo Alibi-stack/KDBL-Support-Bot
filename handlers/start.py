@@ -1,34 +1,58 @@
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
 from aiogram import F, Router
 from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
+from aiogram.types import FSInputFile
 from aiogram.types import CallbackQuery, Message
 
-from keyboards.inline import main_menu_keyboard
+from config import get_settings
+from keyboards.inline import language_keyboard, main_menu_keyboard
+from services.reports import build_daily_ticket_report
+from services.ticket_storage import get_user_language, set_user_language
 
 router = Router()
 
-WELCOME_TEXT = (
-    "Здравствуйте! Я KDBL Support, AI-ассистент. Готов помочь.\n"
-    "Сәлеметсіз бе! Мен KDBL Support AI-ассистентімін. Көмектесуге дайынмын.\n\n"
-    "Задайте вопрос AI. Если понадобится помощь человека, можно создать тикет "
-    "оператору.\n"
-    "AI-ға сұрақ қойыңыз. Қажет болса, операторға тикет ашуға болады."
-)
+WELCOME_TEXTS = {
+    "ru": (
+        "Здравствуйте! Я KDBL Support, AI-ассистент. Готов помочь.\n\n"
+        "Задайте вопрос AI. Если понадобится помощь человека, можно создать "
+        "тикет оператору."
+    ),
+    "kz": (
+        "Сәлеметсіз бе! Мен KDBL Support AI-ассистентімін. Көмектесуге дайынмын.\n\n"
+        "AI-ға сұрақ қойыңыз. Қажет болса, операторға тикет ашуға болады."
+    ),
+}
 
-FAQ_TEXT = (
-    "FAQ\n\n"
-    "FAQ будет добавлен позже.\n"
-    "FAQ кейін қосылады.\n\n"
-    "Пока можно задать вопрос AI. После ответа AI можно создать тикет оператору.\n"
-    "Әзірге AI-ға сұрақ қоюға болады. AI жауабынан кейін операторға тикет "
-    "ашуға болады."
+FAQ_TEXTS = {
+    "ru": (
+        "FAQ\n\n"
+        "FAQ будет добавлен позже.\n\n"
+        "Пока можно задать вопрос AI. После ответа AI можно создать тикет оператору."
+    ),
+    "kz": (
+        "FAQ\n\n"
+        "FAQ кейін қосылады.\n\n"
+        "Әзірге AI-ға сұрақ қоюға болады. AI жауабынан кейін операторға тикет "
+        "ашуға болады."
+    ),
+}
+
+LANGUAGE_PROMPT = (
+    "Выберите язык / Тілді таңдаңыз"
 )
 
 
 @router.message(CommandStart())
 async def command_start(message: Message, state: FSMContext) -> None:
     await state.clear()
-    await message.answer(WELCOME_TEXT, reply_markup=main_menu_keyboard())
+    language = await get_user_language(message.from_user.id)
+    if language is None:
+        await message.answer(LANGUAGE_PROMPT, reply_markup=language_keyboard())
+        return
+    await message.answer(get_welcome_text(language), reply_markup=main_menu_keyboard())
 
 
 @router.message(Command("chat_id"))
@@ -57,14 +81,113 @@ async def command_forum_status(message: Message) -> None:
     )
 
 
+@router.message(Command("daily_report"))
+async def command_daily_report(message: Message) -> None:
+    settings = get_settings()
+    if settings.admin_chat_id is None or message.chat.id != settings.admin_chat_id:
+        return
+
+    report_date = datetime.now(ZoneInfo(settings.timezone)).date()
+    report_path = await build_daily_ticket_report(report_date)
+    await message.answer_document(
+        FSInputFile(report_path),
+        caption=f"Отчёт по тикетам за {report_date:%d.%m.%Y}",
+    )
+
+
 @router.callback_query(F.data == "main_menu")
 async def show_main_menu(callback: CallbackQuery, state: FSMContext) -> None:
     await state.clear()
-    await callback.message.edit_text(WELCOME_TEXT, reply_markup=main_menu_keyboard())
+    language = await get_callback_language(callback)
+    await callback.message.edit_text(
+        get_welcome_text(language),
+        reply_markup=main_menu_keyboard(),
+    )
     await callback.answer()
 
 
 @router.callback_query(F.data == "faq")
 async def show_faq(callback: CallbackQuery) -> None:
-    await callback.message.edit_text(FAQ_TEXT, reply_markup=main_menu_keyboard())
+    language = await get_callback_language(callback)
+    await callback.message.edit_text(
+        FAQ_TEXTS.get(language, FAQ_TEXTS["ru"]),
+        reply_markup=main_menu_keyboard(),
+    )
     await callback.answer()
+
+
+@router.callback_query(F.data.startswith("lang:"))
+async def choose_language(callback: CallbackQuery) -> None:
+    language = callback.data.split(":", 1)[1]
+    if language not in {"ru", "kz"}:
+        await callback.answer()
+        return
+    await set_user_language(callback.from_user.id, language)
+    await callback.message.edit_text(
+        get_welcome_text(language),
+        reply_markup=main_menu_keyboard(),
+    )
+    await callback.answer("Сохранено")
+
+
+@router.callback_query(F.data == "change_language")
+async def change_language(callback: CallbackQuery) -> None:
+    await callback.message.edit_text(LANGUAGE_PROMPT, reply_markup=language_keyboard())
+    await callback.answer()
+
+
+@router.callback_query(F.data == "phonebook")
+async def show_phonebook(callback: CallbackQuery) -> None:
+    language = await get_callback_language(callback)
+    text = (
+        "Справочник номеров пока не заполнен. Когда вы дадите номера, я добавлю "
+        "их сюда."
+        if language == "ru"
+        else "Нөмірлер анықтамалығы әзірге толтырылмаған. Нөмірлерді бергенде, "
+        "осында қосамын."
+    )
+    await callback.message.edit_text(text, reply_markup=main_menu_keyboard())
+    await callback.answer()
+
+
+@router.callback_query(F.data == "duty_contact")
+async def show_duty_contact(callback: CallbackQuery) -> None:
+    language = await get_callback_language(callback)
+    await callback.message.edit_text(
+        build_duty_text(language),
+        reply_markup=main_menu_keyboard(),
+    )
+    await callback.answer()
+
+
+async def get_callback_language(callback: CallbackQuery) -> str:
+    language = await get_user_language(callback.from_user.id)
+    return language or "ru"
+
+
+def get_welcome_text(language: str | None) -> str:
+    return WELCOME_TEXTS.get(language or "ru", WELCOME_TEXTS["ru"])
+
+
+def build_duty_text(language: str) -> str:
+    settings = get_settings()
+    now = datetime.now(ZoneInfo(settings.timezone))
+    after_hours = now.hour >= settings.workday_end_hour
+
+    if settings.duty_contact:
+        if language == "kz":
+            return (
+                f"Жұмыс уақытынан кейін кезекші байланысы: {settings.duty_contact}"
+            )
+        return f"После рабочего времени дежурный контакт: {settings.duty_contact}"
+
+    if language == "kz":
+        prefix = "Қазір жұмыс уақытынан кейін." if after_hours else "Кезекші байланысы."
+        return (
+            f"{prefix} Кезекші оператордың username/телефоны әзірге қосылмаған."
+        )
+
+    prefix = "Сейчас вне рабочего времени." if after_hours else "Контакт дежурного."
+    return (
+        f"{prefix} Username или телефон дежурного пока не добавлен."
+    )

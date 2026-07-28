@@ -1,6 +1,17 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 
+def language_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="Русский", callback_data="lang:ru"),
+                InlineKeyboardButton(text="Қазақша", callback_data="lang:kz"),
+            ]
+        ]
+    )
+
+
 def main_menu_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
@@ -11,6 +22,24 @@ def main_menu_keyboard() -> InlineKeyboardMarkup:
                 )
             ],
             [InlineKeyboardButton(text="FAQ", callback_data="faq")],
+            [
+                InlineKeyboardButton(
+                    text="Справочник номеров",
+                    callback_data="phonebook",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="Дежурный оператор",
+                    callback_data="duty_contact",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="Сменить язык / Тілді ауыстыру",
+                    callback_data="change_language",
+                )
+            ],
         ]
     )
 

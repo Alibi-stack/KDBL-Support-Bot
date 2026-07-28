@@ -25,6 +25,20 @@ class Ticket:
     admin_thread_id: int | None
 
 
+@dataclass(frozen=True)
+class TicketReportRow:
+    id: int
+    user_id: int
+    user_name: str
+    username: str | None
+    question: str
+    status: str
+    operator_name: str | None
+    created_at: str
+    updated_at: str
+    closed_at: str | None
+
+
 def _now() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds")
 
@@ -87,6 +101,26 @@ def _init_db_sync() -> None:
                 text TEXT NOT NULL,
                 created_at TEXT NOT NULL,
                 FOREIGN KEY(ticket_id) REFERENCES tickets(id)
+            );
+
+            CREATE TABLE IF NOT EXISTS user_settings (
+                user_id INTEGER PRIMARY KEY,
+                language TEXT NOT NULL DEFAULT 'ru',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS moderation_state (
+                user_id INTEGER PRIMARY KEY,
+                warnings INTEGER NOT NULL DEFAULT 0,
+                muted_until TEXT,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS app_state (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL,
+                updated_at TEXT NOT NULL
             );
             """
         )
@@ -332,3 +366,149 @@ async def add_message(
         sender_name,
         text,
     )
+
+
+def _get_user_language_sync(user_id: int) -> str | None:
+    with _connect() as connection:
+        row = connection.execute(
+            "SELECT language FROM user_settings WHERE user_id = ?",
+            (user_id,),
+        ).fetchone()
+    return row["language"] if row else None
+
+
+async def get_user_language(user_id: int) -> str | None:
+    return await asyncio.to_thread(_get_user_language_sync, user_id)
+
+
+def _set_user_language_sync(user_id: int, language: str) -> None:
+    now = _now()
+    with _connect() as connection:
+        connection.execute(
+            """
+            INSERT INTO user_settings (user_id, language, created_at, updated_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET
+                language = excluded.language,
+                updated_at = excluded.updated_at
+            """,
+            (user_id, language, now, now),
+        )
+
+
+async def set_user_language(user_id: int, language: str) -> None:
+    await asyncio.to_thread(_set_user_language_sync, user_id, language)
+
+
+def _get_moderation_state_sync(user_id: int) -> tuple[int, str | None]:
+    with _connect() as connection:
+        row = connection.execute(
+            "SELECT warnings, muted_until FROM moderation_state WHERE user_id = ?",
+            (user_id,),
+        ).fetchone()
+    if row is None:
+        return 0, None
+    return row["warnings"], row["muted_until"]
+
+
+async def get_moderation_state(user_id: int) -> tuple[int, str | None]:
+    return await asyncio.to_thread(_get_moderation_state_sync, user_id)
+
+
+def _set_moderation_state_sync(
+    user_id: int,
+    warnings: int,
+    muted_until: str | None,
+) -> None:
+    now = _now()
+    with _connect() as connection:
+        connection.execute(
+            """
+            INSERT INTO moderation_state (user_id, warnings, muted_until, updated_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET
+                warnings = excluded.warnings,
+                muted_until = excluded.muted_until,
+                updated_at = excluded.updated_at
+            """,
+            (user_id, warnings, muted_until, now),
+        )
+
+
+async def set_moderation_state(
+    user_id: int,
+    warnings: int,
+    muted_until: str | None,
+) -> None:
+    await asyncio.to_thread(_set_moderation_state_sync, user_id, warnings, muted_until)
+
+
+def _get_app_state_sync(key: str) -> str | None:
+    with _connect() as connection:
+        row = connection.execute(
+            "SELECT value FROM app_state WHERE key = ?",
+            (key,),
+        ).fetchone()
+    return row["value"] if row else None
+
+
+async def get_app_state(key: str) -> str | None:
+    return await asyncio.to_thread(_get_app_state_sync, key)
+
+
+def _set_app_state_sync(key: str, value: str) -> None:
+    with _connect() as connection:
+        connection.execute(
+            """
+            INSERT INTO app_state (key, value, updated_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(key) DO UPDATE SET
+                value = excluded.value,
+                updated_at = excluded.updated_at
+            """,
+            (key, value, _now()),
+        )
+
+
+async def set_app_state(key: str, value: str) -> None:
+    await asyncio.to_thread(_set_app_state_sync, key, value)
+
+
+def _get_tickets_for_period_sync(
+    start_iso: str,
+    end_iso: str,
+) -> list[TicketReportRow]:
+    with _connect() as connection:
+        rows = connection.execute(
+            """
+            SELECT
+                id, user_id, user_name, username, question, status,
+                operator_name, created_at, updated_at, closed_at
+            FROM tickets
+            WHERE created_at >= ? AND created_at < ?
+            ORDER BY id
+            """,
+            (start_iso, end_iso),
+        ).fetchall()
+    return [
+        TicketReportRow(
+            id=row["id"],
+            user_id=row["user_id"],
+            user_name=row["user_name"],
+            username=row["username"],
+            question=row["question"],
+            status=row["status"],
+            operator_name=row["operator_name"],
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+            closed_at=row["closed_at"],
+        )
+        for row in rows
+    ]
+
+
+async def get_tickets_for_period(
+    start_iso: str,
+    end_iso: str,
+) -> list[TicketReportRow]:
+    return await asyncio.to_thread(_get_tickets_for_period_sync, start_iso, end_iso)
