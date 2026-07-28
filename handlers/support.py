@@ -27,6 +27,7 @@ from keyboards.inline import (
     ticket_claim_keyboard,
     ticket_keyboard,
     ticket_open_keyboard,
+    ticket_phonebook_keyboard,
     ticket_transfer_keyboard,
 )
 from keyboards.reply import cancel_keyboard
@@ -76,7 +77,13 @@ CANNED_RESPONSES = {
         "Мәселе шешілді ме, тексеріп жіберіңіз. Егер бәрі жұмыс істесе, өтінішті "
         "жабамыз."
     ),
-    "phonebook": build_phonebook_text("ru"),
+}
+
+PHONEBOOK_RESPONSES = {
+    "simbase": "Номера сотрудников по Simbase:\n\n535 - Асхат\n534 - Абдулла\n474 - Олжас",
+    "metadoc": "Номера сотрудников по Metadoc:\n\n700 - Дархан\n477 - Абылайхан",
+    "lotus_tech": "Номера сотрудников по Lotus и техническим вопросам:\n\n700 - Дархан",
+    "all": build_phonebook_text("ru"),
 }
 
 
@@ -228,6 +235,55 @@ async def close_ticket_callback(callback: CallbackQuery) -> None:
     )
     await maybe_close_topic(callback)
     await callback.answer("Закрыто")
+
+
+@router.callback_query(F.data.startswith("ticket_phonebook_menu:"))
+async def show_ticket_phonebook_menu(callback: CallbackQuery) -> None:
+    ticket_id = int(callback.data.split(":", 1)[1])
+    ticket = await get_ticket(ticket_id)
+
+    if ticket is None or ticket.status == "closed":
+        await callback.answer("Обращение не найдено или закрыто", show_alert=True)
+        return
+
+    await callback.message.answer(
+        "Выберите, какие номера отправить пользователю:",
+        reply_markup=ticket_phonebook_keyboard(ticket.id),
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("ticket_phonebook:"))
+async def send_ticket_phonebook_response(callback: CallbackQuery) -> None:
+    _, ticket_id_text, category = callback.data.split(":", 2)
+    ticket_id = int(ticket_id_text)
+    response = PHONEBOOK_RESPONSES.get(category)
+
+    if response is None:
+        await callback.answer("Категория не найдена", show_alert=True)
+        return
+
+    ticket = await get_ticket(ticket_id)
+    if ticket is None or ticket.status == "closed":
+        await callback.answer("Обращение не найдено или закрыто", show_alert=True)
+        return
+
+    operator = callback.from_user
+    if operator.is_bot:
+        await callback.answer()
+        return
+
+    await send_operator_text_to_user(
+        bot_message=callback.message,
+        ticket_id=ticket.id,
+        operator_id=operator.id,
+        operator_name=operator.full_name,
+        text=response,
+    )
+    await callback.message.answer(
+        f"Номера сотрудников отправлены пользователю по тикету #{ticket.id}."
+    )
+    await callback.answer("Отправлено")
 
 
 @router.callback_query(F.data.startswith("ticket_tpl:"))

@@ -127,7 +127,36 @@ def ticket_keyboard(ticket_id: int) -> InlineKeyboardMarkup:
             [
                 InlineKeyboardButton(
                     text="Номера сотрудников",
-                    callback_data=f"ticket_tpl:{ticket_id}:phonebook",
+                    callback_data=f"ticket_phonebook_menu:{ticket_id}",
+                ),
+            ],
+        ]
+    )
+
+
+def ticket_phonebook_keyboard(ticket_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="Simbase",
+                    callback_data=f"ticket_phonebook:{ticket_id}:simbase",
+                ),
+                InlineKeyboardButton(
+                    text="Metadoc",
+                    callback_data=f"ticket_phonebook:{ticket_id}:metadoc",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text="Lotus / тех. вопросы",
+                    callback_data=f"ticket_phonebook:{ticket_id}:lotus_tech",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text="Все номера",
+                    callback_data=f"ticket_phonebook:{ticket_id}:all",
                 ),
             ],
         ]
