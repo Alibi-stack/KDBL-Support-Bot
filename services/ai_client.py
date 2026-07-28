@@ -48,14 +48,14 @@ async def get_ai_response(
     settings = get_settings()
     provider = settings.ai_provider.lower()
 
-    if provider == "gemini" and settings.gemini_api_key:
+    if provider == "groq" and settings.groq_api_key:
         try:
             return await asyncio.wait_for(
-                _get_gemini_response(user_text, history or []),
-                timeout=12,
+                _get_groq_response(user_text, history or []),
+                timeout=settings.ai_request_timeout,
             )
         except (AIServiceError, TimeoutError, asyncio.TimeoutError):
-            logger.exception("Gemini unavailable, using local fallback")
+            logger.exception("Groq unavailable, using local fallback")
             return await _get_local_it_fallback(user_text, history or [])
 
     return await _get_stub_response(user_text)
@@ -72,8 +72,8 @@ async def _get_stub_response(user_text: str) -> str:
         )
 
     return (
-        "Тестовый ответ AI-модуля. Сейчас можно подключить Gemini через "
-        "GEMINI_API_KEY в .env.\n\n"
+        "Тестовый ответ AI-модуля. Сейчас можно подключить Groq через "
+        "GROQ_API_KEY в .env.\n\n"
         f"Ваш вопрос: {user_text}"
     )
 
@@ -185,38 +185,44 @@ async def _get_local_it_fallback(
     )
 
 
-async def _get_gemini_response(
+async def _get_groq_response(
     user_text: str,
     history: list[dict[str, str]],
 ) -> str:
     try:
-        return await asyncio.to_thread(_generate_gemini_text, user_text, history)
+        return await asyncio.to_thread(_generate_groq_text, user_text, history)
     except Exception as error:
-        logger.exception("Gemini API request failed")
-        raise AIServiceError("Gemini API request failed") from error
+        logger.exception("Groq API request failed")
+        raise AIServiceError("Groq API request failed") from error
 
 
-def _generate_gemini_text(
+def _generate_groq_text(
     user_text: str,
     history: list[dict[str, str]],
 ) -> str:
-    from google import genai
+    from groq import Groq
 
     settings = get_settings()
-    client = genai.Client(api_key=settings.gemini_api_key)
+    client = Groq(api_key=settings.groq_api_key)
     context = format_history(history)
-    response = client.models.generate_content(
-        model=settings.gemini_model,
-        contents=(
-            f"{SYSTEM_PROMPT}\n\n"
-            f"История диалога:\n{context}\n\n"
-            f"Текущий вопрос пользователя:\n{user_text}"
-        ),
+    response = client.chat.completions.create(
+        model=settings.groq_model,
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {
+                "role": "user",
+                "content": (
+                    f"История диалога:\n{context}\n\n"
+                    f"Текущий вопрос пользователя:\n{user_text}"
+                ),
+            },
+        ],
+        temperature=0.4,
     )
 
-    text = getattr(response, "text", None)
+    text = response.choices[0].message.content if response.choices else None
     if not text:
-        raise AIServiceError("Gemini returned an empty response")
+        raise AIServiceError("Groq returned an empty response")
 
     return text.strip()
 

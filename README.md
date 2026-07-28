@@ -53,12 +53,12 @@ AI_PROVIDER=stub
 или
 
 ```env
-AI_PROVIDER=gemini
-GEMINI_API_KEY=...
-GEMINI_MODEL=gemini-2.5-flash
+AI_PROVIDER=groq
+GROQ_API_KEY=...
+GROQ_MODEL=llama-3.3-70b-versatile
 ```
 
-Gemini подключен через официальный пакет `google-genai`.
+Groq подключен через официальный пакет `groq`.
 
 ## Операторская группа
 
