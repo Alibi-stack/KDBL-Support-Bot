@@ -63,6 +63,10 @@ CANNED_RESPONSES = {
 @router.callback_query(F.data == "human_support")
 async def ask_support_question(callback: CallbackQuery, state: FSMContext) -> None:
     user = callback.from_user
+    if user.is_bot:
+        await callback.answer()
+        return
+
     active_ticket = await get_active_ticket_by_user(user.id)
     if active_ticket:
         await callback.message.answer(
@@ -95,6 +99,10 @@ async def ask_support_question(callback: CallbackQuery, state: FSMContext) -> No
 async def take_ticket(callback: CallbackQuery) -> None:
     ticket_id = int(callback.data.split(":", 1)[1])
     user = callback.from_user
+    if user.is_bot:
+        await callback.answer()
+        return
+
     ticket = await assign_ticket(ticket_id, user.id, user.full_name)
 
     if ticket is None:
@@ -171,6 +179,10 @@ async def send_canned_response(callback: CallbackQuery) -> None:
         return
 
     operator = callback.from_user
+    if operator.is_bot:
+        await callback.answer()
+        return
+
     await send_operator_text_to_user(
         bot_message=callback.message,
         ticket_id=ticket.id,
@@ -186,6 +198,9 @@ async def send_canned_response(callback: CallbackQuery) -> None:
 
 @router.message(UserDialog.waiting_support_question, F.text)
 async def handle_support_question(message: Message, state: FSMContext) -> None:
+    if message.from_user and message.from_user.is_bot:
+        return
+
     if message.text.casefold() in {"отмена", "болдырмау"}:
         await state.clear()
         await message.answer(
@@ -213,6 +228,8 @@ async def handle_support_non_text(message: Message) -> None:
 async def handle_admin_reply(message: Message) -> None:
     settings = get_settings()
     if settings.admin_chat_id is None:
+        return
+    if message.from_user and message.from_user.is_bot:
         return
 
     ticket_id = parse_ticket_id(message.reply_to_message.text or "")
@@ -252,7 +269,7 @@ async def handle_admin_topic_message(message: Message) -> None:
 @router.message(F.chat.type == "private", F.text)
 async def forward_user_message_to_operator(message: Message) -> None:
     user = message.from_user
-    if user is None:
+    if user is None or user.is_bot:
         return
 
     ticket = await get_active_ticket_by_user(user.id)
@@ -309,6 +326,9 @@ async def create_support_ticket(
         return
 
     user = message.from_user
+    if user is not None and user.is_bot:
+        return
+
     user_id = user.id if user else message.chat.id
     user_name = user.full_name if user else "unknown"
     username = user.username if user else None
@@ -379,6 +399,9 @@ async def create_support_ticket(
 
 
 async def handle_operator_message(message: Message, ticket_id: int) -> None:
+    if message.from_user and message.from_user.is_bot:
+        return
+
     if not message.text:
         await message.answer("Пока можно отправлять пользователю только текст.")
         return
