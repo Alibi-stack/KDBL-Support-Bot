@@ -33,29 +33,36 @@ def main_menu_keyboard() -> InlineKeyboardMarkup:
 
 
 def after_ai_keyboard(show_duty: bool = False) -> InlineKeyboardMarkup:
-    keyboard = [
-        [
-            InlineKeyboardButton(
-                text="Создать обращение оператору",
-                callback_data="human_support",
-            )
-        ],
-        [
-            InlineKeyboardButton(
-                text="Справочник номеров",
-                callback_data="phonebook",
-            )
-        ],
-    ]
     if show_duty:
-        keyboard.append(
+        keyboard = [
             [
                 InlineKeyboardButton(
                     text="Дежурный оператор",
                     callback_data="duty_contact",
                 )
-            ]
-        )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="Справочник номеров",
+                    callback_data="phonebook",
+                )
+            ],
+        ]
+    else:
+        keyboard = [
+            [
+                InlineKeyboardButton(
+                    text="Создать обращение оператору",
+                    callback_data="human_support",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="Справочник номеров",
+                    callback_data="phonebook",
+                )
+            ],
+        ]
     keyboard.append([InlineKeyboardButton(text="Главное меню", callback_data="main_menu")])
     return InlineKeyboardMarkup(
         inline_keyboard=keyboard

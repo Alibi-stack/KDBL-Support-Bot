@@ -91,7 +91,13 @@ async def ask_support_question(callback: CallbackQuery, state: FSMContext) -> No
 
     if is_after_work_hours():
         language = await get_callback_language(callback)
-        await callback.message.answer(build_duty_text(language))
+        await state.clear()
+        await callback.message.answer(
+            build_duty_text(language),
+            reply_markup=main_menu_keyboard(),
+        )
+        await callback.answer("Сейчас вне рабочего времени")
+        return
 
     data = await state.get_data()
     last_question = data.get("last_question")
@@ -220,6 +226,15 @@ async def send_canned_response(callback: CallbackQuery) -> None:
 @router.message(UserDialog.waiting_support_question, F.text)
 async def handle_support_question(message: Message, state: FSMContext) -> None:
     if message.from_user and message.from_user.is_bot:
+        return
+
+    if is_after_work_hours():
+        language = await get_message_language(message)
+        await state.clear()
+        await message.answer(
+            build_duty_text(language),
+            reply_markup=main_menu_keyboard(),
+        )
         return
 
     if message.text.casefold() in {"отмена", "болдырмау"}:
