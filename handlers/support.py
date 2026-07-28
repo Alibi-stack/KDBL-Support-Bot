@@ -27,6 +27,7 @@ from keyboards.inline import (
     ticket_claim_keyboard,
     ticket_keyboard,
     ticket_open_keyboard,
+    ticket_transfer_keyboard,
 )
 from keyboards.reply import cancel_keyboard
 from services.ai_client import AIServiceError, get_ai_response
@@ -40,6 +41,7 @@ from services.ticket_storage import (
     get_active_ticket_by_user,
     get_ticket,
     get_ticket_by_thread,
+    release_ticket,
     set_ticket_admin_message,
     set_ticket_admin_thread,
 )
@@ -174,6 +176,35 @@ async def take_ticket(callback: CallbackQuery) -> None:
         f"Оператор #{ticket.id} өтінішін жұмысқа алды.",
     )
     await callback.answer("Взято в работу")
+
+
+@router.callback_query(F.data.startswith("ticket_transfer:"))
+async def transfer_ticket(callback: CallbackQuery) -> None:
+    ticket_id = int(callback.data.split(":", 1)[1])
+    ticket = await get_ticket(ticket_id)
+
+    if ticket is None:
+        await callback.answer("Обращение не найдено", show_alert=True)
+        return
+
+    if ticket.status == "closed":
+        await callback.answer("Тикет уже закрыт", show_alert=True)
+        return
+
+    ticket = await release_ticket(ticket_id)
+    if ticket is None:
+        await callback.answer("Не удалось передать тикет", show_alert=True)
+        return
+
+    try:
+        await callback.message.edit_reply_markup(reply_markup=ticket_claim_keyboard(ticket.id))
+    except TelegramBadRequest:
+        logger.exception("Cannot switch ticket keyboard to claim mode")
+
+    await callback.message.answer(
+        f"Тикет #{ticket.id} передан. Теперь другой оператор может взять его в работу."
+    )
+    await callback.answer("Передано")
 
 
 @router.callback_query(F.data.startswith("ticket_close:"))
@@ -366,6 +397,7 @@ async def forward_user_photo_to_operator(message: Message) -> None:
             f"{caption}"
         ),
         ticket.admin_thread_id,
+        transfer_keyboard=True,
     )
     await message.answer(
         "Фото передано оператору.\n"
@@ -407,6 +439,7 @@ async def forward_user_message_to_operator(message: Message, state: FSMContext) 
             f"{message.text}"
         ),
         ticket.admin_thread_id,
+        transfer_keyboard=True,
     )
     await message.answer(
         "Сообщение передано оператору.\n"
@@ -497,7 +530,7 @@ async def create_support_ticket(
                 f"{question}"
             ),
             active_ticket.admin_thread_id,
-            full_keyboard=active_ticket.admin_thread_id is not None,
+            transfer_keyboard=True,
         )
         await state.clear()
         await message.answer(
@@ -584,9 +617,15 @@ async def send_admin_ticket_message(
     text: str,
     thread_id: int | None,
     full_keyboard: bool = False,
+    transfer_keyboard: bool = False,
 ) -> None:
     settings = get_settings()
-    keyboard = ticket_keyboard(ticket_id) if full_keyboard else ticket_claim_keyboard(ticket_id)
+    if transfer_keyboard:
+        keyboard = ticket_transfer_keyboard(ticket_id)
+    elif full_keyboard:
+        keyboard = ticket_keyboard(ticket_id)
+    else:
+        keyboard = ticket_claim_keyboard(ticket_id)
     try:
         await message.bot.send_message(
             settings.admin_chat_id,
@@ -599,7 +638,7 @@ async def send_admin_ticket_message(
         await message.bot.send_message(
             settings.admin_chat_id,
             text,
-            reply_markup=ticket_claim_keyboard(ticket_id),
+            reply_markup=keyboard,
         )
 
 
@@ -608,18 +647,20 @@ async def send_admin_photo_message(
     ticket_id: int,
     caption: str,
     thread_id: int | None,
+    transfer_keyboard: bool = False,
 ) -> None:
     settings = get_settings()
     if not message.photo:
         return
 
     photo_id = message.photo[-1].file_id
+    keyboard = ticket_transfer_keyboard(ticket_id) if transfer_keyboard else ticket_keyboard(ticket_id)
     try:
         await message.bot.send_photo(
             settings.admin_chat_id,
             photo=photo_id,
             caption=caption[:1024],
-            reply_markup=ticket_keyboard(ticket_id),
+            reply_markup=keyboard,
             message_thread_id=thread_id,
         )
     except TelegramBadRequest:
@@ -628,7 +669,7 @@ async def send_admin_photo_message(
             settings.admin_chat_id,
             photo=photo_id,
             caption=caption[:1024],
-            reply_markup=ticket_claim_keyboard(ticket_id),
+            reply_markup=keyboard,
         )
 
 

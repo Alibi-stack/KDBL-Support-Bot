@@ -151,6 +151,23 @@ def ticket_claim_keyboard(ticket_id: int) -> InlineKeyboardMarkup:
     )
 
 
+def ticket_transfer_keyboard(ticket_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="Передать",
+                    callback_data=f"ticket_transfer:{ticket_id}",
+                ),
+                InlineKeyboardButton(
+                    text="Закрыть",
+                    callback_data=f"ticket_close:{ticket_id}",
+                ),
+            ]
+        ]
+    )
+
+
 def ticket_open_keyboard(ticket_id: int, topic_url: str | None) -> InlineKeyboardMarkup:
     buttons = []
     if topic_url:

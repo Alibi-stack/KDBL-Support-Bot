@@ -319,6 +319,16 @@ async def assign_ticket(
     )
 
 
+async def release_ticket(ticket_id: int) -> Ticket | None:
+    return await asyncio.to_thread(
+        _update_ticket_sync,
+        ticket_id,
+        status="open",
+        operator_id=None,
+        operator_name=None,
+    )
+
+
 async def close_ticket(ticket_id: int) -> Ticket | None:
     return await asyncio.to_thread(
         _update_ticket_sync,
