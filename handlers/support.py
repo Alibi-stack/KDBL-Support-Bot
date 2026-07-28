@@ -17,6 +17,7 @@ from handlers.user_dialog import (
 )
 from keyboards.inline import (
     after_ai_keyboard,
+    back_to_menu_keyboard,
     main_menu_keyboard,
     ticket_claim_keyboard,
     ticket_keyboard,
@@ -184,7 +185,7 @@ async def close_ticket_callback(callback: CallbackQuery) -> None:
         ticket.user_id,
         f"Обращение #{ticket.id} закрыто. Спасибо!\n"
         f"#{ticket.id} өтініші жабылды. Хабарласқаныңызға рақмет!",
-        reply_markup=main_menu_keyboard(),
+        reply_markup=back_to_menu_keyboard(),
     )
     await maybe_close_topic(callback)
     await callback.answer("Закрыто")
