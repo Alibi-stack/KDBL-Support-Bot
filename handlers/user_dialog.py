@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import re
 
 from aiogram import F, Router
 from aiogram.enums import ChatAction
@@ -8,7 +9,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message, ReplyKeyboardRemove
 
 from config import get_settings
-from keyboards.inline import after_ai_keyboard, human_support_keyboard, main_menu_keyboard
+from keyboards.inline import after_ai_keyboard, main_menu_keyboard
 from keyboards.reply import cancel_keyboard
 from services.ai_client import AIServiceError, get_ai_response
 from states.user_states import UserDialog
@@ -72,30 +73,7 @@ async def handle_ai_question(message: Message, state: FSMContext) -> None:
         await processing_message.edit_text(AI_UNAVAILABLE_TEXT)
         return
 
-    if answer.strip().startswith("NEED_HUMAN"):
-        clean_answer = answer.split(":", 1)[-1].strip()
-        try:
-            await processing_message.edit_text(
-                clean_answer
-                or (
-                    "Для этого вопроса лучше подключить оператора.\n"
-                    "Бұл сұраққа операторды қосқан дұрыс."
-                ),
-                reply_markup=human_support_keyboard(),
-            )
-        except TelegramBadRequest:
-            await message.answer(
-                clean_answer
-                or (
-                    "Для этого вопроса лучше подключить оператора.\n"
-                    "Бұл сұраққа операторды қосқан дұрыс."
-                ),
-                reply_markup=human_support_keyboard(),
-            )
-        await state.update_data(last_question=message.text)
-        await save_ai_history(state, history, message.text, clean_answer)
-        await state.set_state(UserDialog.waiting_question)
-        return
+    answer = clean_ai_answer(answer)
 
     chunks = split_long_message(answer)
     try:
@@ -139,3 +117,20 @@ async def save_ai_history(
         {"role": "assistant", "content": ai_text},
     ][-8:]
     await state.update_data(last_question=user_text, ai_history=updated_history)
+
+
+def clean_ai_answer(answer: str) -> str:
+    cleaned_lines = [
+        line for line in answer.splitlines()
+        if line.strip().upper() != "NEED_HUMAN"
+    ]
+    cleaned = "\n".join(cleaned_lines).strip()
+    if cleaned.upper().startswith("NEED_HUMAN:"):
+        cleaned = cleaned.split(":", 1)[1].strip()
+    cleaned = re.sub(
+        r"(?i)\s*Похоже,\s*(?:у вас возникли проблемы с чем-то, но\s*)?"
+        r"вы не указали[^.?!]*[.?!]\s*",
+        " ",
+        cleaned,
+    ).strip()
+    return cleaned or "Готов помочь. Напишите вопрос чуть подробнее."
