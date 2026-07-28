@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     chroma_dir: str = Field(default="./chroma_store", alias="CHROMA_DIR")
     use_vector_rag: bool = Field(default=False, alias="USE_VECTOR_RAG")
     timezone: str = Field(default="Asia/Qyzylorda", alias="TIMEZONE")
+    workday_start_hour: int = Field(default=9, alias="WORKDAY_START_HOUR")
+    workday_start_minute: int = Field(default=30, alias="WORKDAY_START_MINUTE")
     workday_end_hour: int = Field(default=18, alias="WORKDAY_END_HOUR")
     report_hour: int = Field(default=18, alias="REPORT_HOUR")
     duty_contact: str | None = Field(default=None, alias="DUTY_CONTACT")

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, time
 from zoneinfo import ZoneInfo
 
 from aiogram import F, Router
@@ -172,7 +172,7 @@ def get_welcome_text(language: str | None) -> str:
 def build_duty_text(language: str) -> str:
     settings = get_settings()
     now = datetime.now(ZoneInfo(settings.timezone))
-    after_hours = now.hour >= settings.workday_end_hour
+    after_hours = not is_work_time(now)
 
     if settings.duty_contact:
         if language == "kz":
@@ -191,3 +191,11 @@ def build_duty_text(language: str) -> str:
     return (
         f"{prefix} Username или телефон дежурного пока не добавлен."
     )
+
+
+def is_work_time(now: datetime | None = None) -> bool:
+    settings = get_settings()
+    current = now or datetime.now(ZoneInfo(settings.timezone))
+    start = time(settings.workday_start_hour, settings.workday_start_minute)
+    end = time(settings.workday_end_hour, 0)
+    return start <= current.time() < end

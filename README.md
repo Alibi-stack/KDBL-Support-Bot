@@ -78,6 +78,8 @@ Groq подключен через официальный пакет `groq`.
 
 ```env
 TIMEZONE=Asia/Qyzylorda
+WORKDAY_START_HOUR=9
+WORKDAY_START_MINUTE=30
 WORKDAY_END_HOUR=18
 REPORT_HOUR=18
 DUTY_CONTACT=

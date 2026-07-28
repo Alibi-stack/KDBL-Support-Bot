@@ -1,9 +1,6 @@
 import asyncio
 import logging
 import re
-from datetime import datetime
-from zoneinfo import ZoneInfo
-
 from aiogram import F, Router
 from aiogram.enums import ChatAction
 from aiogram.exceptions import TelegramBadRequest
@@ -11,7 +8,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message, ReplyKeyboardRemove
 
 from config import get_settings
-from handlers.start import build_duty_text, get_callback_language
+from handlers.start import build_duty_text, get_callback_language, is_work_time
 from handlers.user_dialog import (
     AI_UNAVAILABLE_TEXT,
     clean_ai_answer,
@@ -118,9 +115,7 @@ async def ask_support_question(callback: CallbackQuery, state: FSMContext) -> No
 
 
 def is_after_work_hours() -> bool:
-    settings = get_settings()
-    now = datetime.now(ZoneInfo(settings.timezone))
-    return now.hour >= settings.workday_end_hour
+    return not is_work_time()
 
 
 @router.callback_query(F.data.startswith("ticket_take:"))
