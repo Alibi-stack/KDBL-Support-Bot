@@ -1,0 +1,35 @@
+import asyncio
+import logging
+
+from aiogram import Bot, Dispatcher
+from aiogram.exceptions import TelegramNetworkError
+from aiogram.fsm.storage.memory import MemoryStorage
+
+from config import get_settings
+from handlers import setup_routers
+from services.ticket_storage import init_db
+
+
+async def main() -> None:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
+
+    settings = get_settings()
+    await init_db()
+
+    bot = Bot(token=settings.bot_token)
+    dispatcher = Dispatcher(storage=MemoryStorage())
+    dispatcher.include_router(setup_routers())
+
+    while True:
+        try:
+            await dispatcher.start_polling(bot)
+        except TelegramNetworkError:
+            logging.exception("Telegram network error, retrying in 5 seconds")
+            await asyncio.sleep(5)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

@@ -1,0 +1,119 @@
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+
+
+def main_menu_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="Спросить AI / AI-дан сұрау",
+                    callback_data="ask_ai",
+                )
+            ],
+            [
+                InlineKeyboardButton(text="FAQ", callback_data="faq"),
+                InlineKeyboardButton(
+                    text="Оператор / Оператормен байланысу",
+                    callback_data="human_support",
+                ),
+            ],
+        ]
+    )
+
+
+def back_to_menu_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")]
+        ]
+    )
+
+
+def human_support_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="Позвать оператора / Оператор шақыру",
+                    callback_data="human_support",
+                )
+            ],
+            [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")],
+        ]
+    )
+
+
+def ticket_keyboard(ticket_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="Взять в работу",
+                    callback_data=f"ticket_take:{ticket_id}",
+                ),
+                InlineKeyboardButton(
+                    text="Закрыть",
+                    callback_data=f"ticket_close:{ticket_id}",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text="Приветствие",
+                    callback_data=f"ticket_tpl:{ticket_id}:hello",
+                ),
+                InlineKeyboardButton(
+                    text="Перезагрузка",
+                    callback_data=f"ticket_tpl:{ticket_id}:reboot",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text="Уточнить данные",
+                    callback_data=f"ticket_tpl:{ticket_id}:details",
+                ),
+                InlineKeyboardButton(
+                    text="Закрывающий ответ",
+                    callback_data=f"ticket_tpl:{ticket_id}:done",
+                ),
+            ],
+        ]
+    )
+
+
+def ticket_claim_keyboard(ticket_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="Взять в работу",
+                    callback_data=f"ticket_take:{ticket_id}",
+                ),
+                InlineKeyboardButton(
+                    text="Закрыть",
+                    callback_data=f"ticket_close:{ticket_id}",
+                ),
+            ]
+        ]
+    )
+
+
+def ticket_open_keyboard(ticket_id: int, topic_url: str | None) -> InlineKeyboardMarkup:
+    buttons = []
+    if topic_url:
+        buttons.append(
+            [
+                InlineKeyboardButton(
+                    text=f"Открыть Ticket #{ticket_id}",
+                    url=topic_url,
+                )
+            ]
+        )
+    buttons.append(
+        [
+            InlineKeyboardButton(
+                text="Закрыть",
+                callback_data=f"ticket_close:{ticket_id}",
+            )
+        ]
+    )
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
