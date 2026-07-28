@@ -271,6 +271,68 @@ async def handle_admin_topic_message(message: Message) -> None:
     await handle_operator_message(message, ticket.id)
 
 
+@router.message(F.chat.id == get_settings().admin_chat_id, F.photo)
+async def handle_admin_topic_photo(message: Message) -> None:
+    settings = get_settings()
+    if settings.admin_chat_id is None:
+        return
+    if message.from_user and message.from_user.is_bot:
+        return
+
+    ticket = None
+    if message.message_thread_id is not None:
+        ticket = await get_ticket_by_thread(message.chat.id, message.message_thread_id)
+    if ticket is None and message.from_user is not None:
+        ticket = await get_active_ticket_by_operator(message.from_user.id)
+    if ticket is None:
+        return
+
+    await handle_operator_message(message, ticket.id)
+
+
+@router.message(F.chat.type == "private", F.photo)
+async def forward_user_photo_to_operator(message: Message) -> None:
+    user = message.from_user
+    if user is None or user.is_bot:
+        return
+
+    ticket = await get_active_ticket_by_user(user.id)
+    if ticket is None:
+        await message.answer(
+            "Сначала создайте тикет оператору, потом отправьте скриншот сюда.\n"
+            "Алдымен операторға тикет ашыңыз, содан кейін скриншотты осында жіберіңіз.",
+            reply_markup=main_menu_keyboard(),
+        )
+        return
+
+    settings = get_settings()
+    if settings.admin_chat_id is None:
+        await message.answer(
+            "Админ-чат пока не настроен.\n"
+            "Админ-чат әлі бапталмаған.",
+            reply_markup=main_menu_keyboard(),
+        )
+        return
+
+    caption = message.caption or "Фото/скриншот от пользователя."
+    await add_message(ticket.id, "user", user.id, user.full_name, f"[photo] {caption}")
+    await send_admin_photo_message(
+        message,
+        ticket.id,
+        (
+            f"Фото от пользователя по тикету #{ticket.id}\n"
+            f"TICKET_ID: {ticket.id}\n"
+            f"Пользователь: {user.full_name}\n\n"
+            f"{caption}"
+        ),
+        ticket.admin_thread_id,
+    )
+    await message.answer(
+        "Фото передано оператору.\n"
+        "Фото операторға жіберілді."
+    )
+
+
 @router.message(F.chat.type == "private", F.text)
 async def forward_user_message_to_operator(message: Message) -> None:
     user = message.from_user
@@ -408,22 +470,33 @@ async def handle_operator_message(message: Message, ticket_id: int) -> None:
     if message.from_user and message.from_user.is_bot:
         return
 
-    if not message.text:
-        await message.answer("Пока можно отправлять пользователю только текст.")
-        return
-
     operator = message.from_user
     operator_name = operator.full_name if operator else "operator"
     operator_id = operator.id if operator else message.chat.id
 
-    await send_operator_text_to_user(
-        bot_message=message,
-        ticket_id=ticket_id,
-        operator_id=operator_id,
-        operator_name=operator_name,
-        text=message.text,
-    )
-    await message.answer("Ответ отправлен пользователю.")
+    if message.text:
+        await send_operator_text_to_user(
+            bot_message=message,
+            ticket_id=ticket_id,
+            operator_id=operator_id,
+            operator_name=operator_name,
+            text=message.text,
+        )
+        await message.answer("Ответ отправлен пользователю.")
+        return
+
+    if message.photo:
+        await send_operator_photo_to_user(
+            bot_message=message,
+            ticket_id=ticket_id,
+            operator_id=operator_id,
+            operator_name=operator_name,
+            caption=message.caption or "",
+        )
+        await message.answer("Фото отправлено пользователю.")
+        return
+
+    await message.answer("Пока можно отправлять пользователю текст или фото.")
 
 
 async def send_admin_ticket_message(
@@ -447,6 +520,35 @@ async def send_admin_ticket_message(
         await message.bot.send_message(
             settings.admin_chat_id,
             text,
+            reply_markup=ticket_claim_keyboard(ticket_id),
+        )
+
+
+async def send_admin_photo_message(
+    message: Message,
+    ticket_id: int,
+    caption: str,
+    thread_id: int | None,
+) -> None:
+    settings = get_settings()
+    if not message.photo:
+        return
+
+    photo_id = message.photo[-1].file_id
+    try:
+        await message.bot.send_photo(
+            settings.admin_chat_id,
+            photo=photo_id,
+            caption=caption[:1024],
+            reply_markup=ticket_keyboard(ticket_id),
+            message_thread_id=thread_id,
+        )
+    except TelegramBadRequest:
+        logger.exception("Cannot send ticket photo to topic, falling back to General")
+        await message.bot.send_photo(
+            settings.admin_chat_id,
+            photo=photo_id,
+            caption=caption[:1024],
             reply_markup=ticket_claim_keyboard(ticket_id),
         )
 
@@ -518,6 +620,36 @@ async def send_operator_text_to_user(
 
     for chunk in split_long_message(f"Оператор по тикету #{ticket.id}:\n\n{text}"):
         await bot_message.bot.send_message(ticket.user_id, chunk)
+
+
+async def send_operator_photo_to_user(
+    bot_message: Message,
+    ticket_id: int,
+    operator_id: int,
+    operator_name: str,
+    caption: str,
+) -> None:
+    ticket = await get_ticket(ticket_id)
+    if ticket is None or ticket.status == "closed":
+        await bot_message.answer("Тикет не найден или уже закрыт.")
+        return
+    if not bot_message.photo:
+        return
+
+    await add_message(ticket.id, "operator", operator_id, operator_name, f"[photo] {caption}")
+
+    if ticket.status == "open":
+        ticket = await assign_ticket(ticket.id, operator_id, operator_name) or ticket
+
+    user_caption = f"Оператор по тикету #{ticket.id}"
+    if caption:
+        user_caption = f"{user_caption}:\n\n{caption}"
+
+    await bot_message.bot.send_photo(
+        ticket.user_id,
+        photo=bot_message.photo[-1].file_id,
+        caption=user_caption[:1024],
+    )
 
 
 async def create_ticket_topic(
