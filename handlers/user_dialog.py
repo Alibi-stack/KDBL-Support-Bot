@@ -26,6 +26,7 @@ AI_UNAVAILABLE_TEXT = (
 @router.callback_query(F.data == "ask_ai")
 async def ask_ai(callback: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(UserDialog.waiting_question)
+    await state.update_data(ai_history=[])
     await callback.message.answer(
         "Напишите ваш вопрос одним сообщением.\n"
         "Сұрағыңызды бір хабарламада жазыңыз.",
@@ -48,6 +49,8 @@ async def cancel_dialog(message: Message, state: FSMContext) -> None:
 @router.message(UserDialog.waiting_question, F.text)
 async def handle_ai_question(message: Message, state: FSMContext) -> None:
     settings = get_settings()
+    data = await state.get_data()
+    history = data.get("ai_history", [])
     await message.bot.send_chat_action(message.chat.id, ChatAction.TYPING)
     processing_message = await message.answer(
         "Запрос обрабатывается...\n"
@@ -57,7 +60,7 @@ async def handle_ai_question(message: Message, state: FSMContext) -> None:
 
     try:
         answer = await asyncio.wait_for(
-            get_ai_response(message.text),
+            get_ai_response(message.text, history=history),
             timeout=settings.ai_request_timeout,
         )
     except (AIServiceError, TimeoutError, asyncio.TimeoutError):
@@ -90,6 +93,7 @@ async def handle_ai_question(message: Message, state: FSMContext) -> None:
                 reply_markup=human_support_keyboard(),
             )
         await state.update_data(last_question=message.text)
+        await save_ai_history(state, history, message.text, clean_answer)
         await state.set_state(UserDialog.waiting_question)
         return
 
@@ -102,7 +106,7 @@ async def handle_ai_question(message: Message, state: FSMContext) -> None:
     for chunk in chunks[1:]:
         await message.answer(chunk)
 
-    await state.update_data(last_question=message.text)
+    await save_ai_history(state, history, message.text, answer)
     await state.set_state(UserDialog.waiting_question)
     await message.answer(
         "Можете сразу написать следующий вопрос. Если ответ AI не помог, "
@@ -121,3 +125,17 @@ async def handle_non_text_question(message: Message) -> None:
         "Әзірге тек мәтіндік сұрақтарды түсінемін. Сұрақ жазыңыз немесе "
         "Отмена басыңыз."
     )
+
+
+async def save_ai_history(
+    state: FSMContext,
+    history: list[dict[str, str]],
+    user_text: str,
+    ai_text: str,
+) -> None:
+    updated_history = [
+        *history,
+        {"role": "user", "content": user_text},
+        {"role": "assistant", "content": ai_text},
+    ][-8:]
+    await state.update_data(last_question=user_text, ai_history=updated_history)

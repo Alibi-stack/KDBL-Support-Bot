@@ -21,13 +21,23 @@ SYSTEM_PROMPT = """
 другой проблемой. Если пользователь написал, что компьютер завис, отвечай про
 зависший компьютер, а не про аккаунт, принтер или интернет.
 
+Учитывай историю диалога. Если пользователь пишет "альтернативы", "не помогло",
+"та же задача", "еще варианты", "перечисли их", понимай это как продолжение
+предыдущей IT-проблемы.
+
+Если вопрос не относится к IT/helpdesk/техподдержке/рабочим сервисам, вежливо
+скажи, что помогаешь только с IT-поддержкой, и предложи задать IT-вопрос.
+
 Если вопрос опасный, требует прав администратора, физического ремонта, доступа к
 личным данным или ты не уверен в решении, в конце ответа напиши:
 NEED_HUMAN
 """.strip()
 
 
-async def get_ai_response(user_text: str) -> str:
+async def get_ai_response(
+    user_text: str,
+    history: list[dict[str, str]] | None = None,
+) -> str:
     if not user_text.strip():
         raise AIServiceError("Empty user request")
 
@@ -36,7 +46,10 @@ async def get_ai_response(user_text: str) -> str:
 
     if provider == "gemini" and settings.gemini_api_key:
         try:
-            return await asyncio.wait_for(_get_gemini_response(user_text), timeout=12)
+            return await asyncio.wait_for(
+                _get_gemini_response(user_text, history or []),
+                timeout=12,
+            )
         except (AIServiceError, TimeoutError, asyncio.TimeoutError):
             logger.exception("Gemini unavailable, using local fallback")
             return await _get_local_it_fallback(user_text)
@@ -96,22 +109,33 @@ async def _get_local_it_fallback(user_text: str) -> str:
     )
 
 
-async def _get_gemini_response(user_text: str) -> str:
+async def _get_gemini_response(
+    user_text: str,
+    history: list[dict[str, str]],
+) -> str:
     try:
-        return await asyncio.to_thread(_generate_gemini_text, user_text)
+        return await asyncio.to_thread(_generate_gemini_text, user_text, history)
     except Exception as error:
         logger.exception("Gemini API request failed")
         raise AIServiceError("Gemini API request failed") from error
 
 
-def _generate_gemini_text(user_text: str) -> str:
+def _generate_gemini_text(
+    user_text: str,
+    history: list[dict[str, str]],
+) -> str:
     from google import genai
 
     settings = get_settings()
     client = genai.Client(api_key=settings.gemini_api_key)
+    context = format_history(history)
     response = client.models.generate_content(
         model=settings.gemini_model,
-        contents=f"{SYSTEM_PROMPT}\n\nВопрос пользователя:\n{user_text}",
+        contents=(
+            f"{SYSTEM_PROMPT}\n\n"
+            f"История диалога:\n{context}\n\n"
+            f"Текущий вопрос пользователя:\n{user_text}"
+        ),
     )
 
     text = getattr(response, "text", None)
@@ -119,3 +143,21 @@ def _generate_gemini_text(user_text: str) -> str:
         raise AIServiceError("Gemini returned an empty response")
 
     return text.strip()
+
+
+def format_history(history: list[dict[str, str]]) -> str:
+    if not history:
+        return "Истории пока нет."
+
+    lines = []
+    for item in history[-8:]:
+        role = item.get("role", "user")
+        content = item.get("content", "").strip()
+        if not content:
+            continue
+        if len(content) > 700:
+            content = f"{content[:700]}..."
+        role_name = "Пользователь" if role == "user" else "AI"
+        lines.append(f"{role_name}: {content}")
+
+    return "\n".join(lines) if lines else "Истории пока нет."
