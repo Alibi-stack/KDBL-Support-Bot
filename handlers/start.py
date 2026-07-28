@@ -142,12 +142,16 @@ async def show_phonebook(callback: CallbackQuery) -> None:
     text = (
         "Справочник номеров операторов:\n\n"
         "700 - Дархан (Lotus, Metadoc, технические вопросы)\n"
-        "535 - Асхат (по Симбейс)\n"
+        "535 - Асхат (Simbase)\n"
+        "534 - Абдулла (Simbase)\n"
+        "474 - Олжас (Simbase)\n"
         "477 - Абылайхан (Metadoc)"
         if language == "ru"
         else "Операторлар нөмірлерінің анықтамалығы:\n\n"
         "700 - Дархан (Lotus, Metadoc, техникалық сұрақтар)\n"
-        "535 - Асхат (Симбейс бойынша)\n"
+        "535 - Асхат (Simbase)\n"
+        "534 - Абдулла (Simbase)\n"
+        "474 - Олжас (Simbase)\n"
         "477 - Абылайхан (Metadoc)"
     )
     await callback.message.edit_text(text, reply_markup=back_to_menu_keyboard())
