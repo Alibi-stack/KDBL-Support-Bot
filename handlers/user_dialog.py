@@ -102,9 +102,9 @@ async def handle_ai_question(message: Message, state: FSMContext) -> None:
         pick(
             language,
             "Можете сразу написать следующий вопрос. Если ответ AI не помог, "
-            "создайте тикет оператору.",
+            "создайте обращение оператору.",
             "Келесі сұрақты бірден жаза аласыз. AI жауабы көмектеспесе, "
-            "операторға тикет ашыңыз.",
+            "операторға өтініш ашыңыз.",
         ),
         reply_markup=after_ai_keyboard(show_duty=not is_work_time()),
     )

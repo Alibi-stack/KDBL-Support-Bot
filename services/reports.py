@@ -50,7 +50,7 @@ async def maybe_send_daily_report(bot: Bot) -> None:
     await bot.send_document(
         settings.admin_chat_id,
         FSInputFile(report_path),
-        caption=f"Ежедневный отчёт по тикетам за {report_date:%d.%m.%Y}",
+        caption=f"Ежедневный отчёт по обращениям за {report_date:%d.%m.%Y}",
     )
     await set_app_state(REPORT_STATE_KEY, report_date.isoformat())
 

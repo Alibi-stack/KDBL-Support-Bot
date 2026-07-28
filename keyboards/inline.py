@@ -36,7 +36,7 @@ def after_ai_keyboard(show_duty: bool = False) -> InlineKeyboardMarkup:
     keyboard = [
         [
             InlineKeyboardButton(
-                text="Создать тикет оператору",
+                text="Создать обращение оператору",
                 callback_data="human_support",
             )
         ],
@@ -144,7 +144,7 @@ def ticket_open_keyboard(ticket_id: int, topic_url: str | None) -> InlineKeyboar
         buttons.append(
             [
                 InlineKeyboardButton(
-                    text=f"Открыть Ticket #{ticket_id}",
+                    text=f"Открыть обращение #{ticket_id}",
                     url=topic_url,
                 )
             ]

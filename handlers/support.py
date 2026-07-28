@@ -64,8 +64,8 @@ CANNED_RESPONSES = {
     ),
     "done": (
         "Проверьте, пожалуйста, решилась ли проблема. Если все работает, мы "
-        "закроем тикет.\n\n"
-        "Мәселе шешілді ме, тексеріп жіберіңіз. Егер бәрі жұмыс істесе, тикетті "
+        "закроем обращение.\n\n"
+        "Мәселе шешілді ме, тексеріп жіберіңіз. Егер бәрі жұмыс істесе, өтінішті "
         "жабамыз."
     ),
 }
@@ -81,9 +81,9 @@ async def ask_support_question(callback: CallbackQuery, state: FSMContext) -> No
     active_ticket = await get_active_ticket_by_user(user.id)
     if active_ticket:
         await callback.message.answer(
-            f"У вас уже есть открытый тикет #{active_ticket.id}. Напишите сюда "
+            f"У вас уже есть открытое обращение #{active_ticket.id}. Напишите сюда "
             "новое сообщение, и я передам его оператору.\n"
-            f"Сізде #{active_ticket.id} ашық тикет бар. Жаңа хабарламаңызды "
+            f"Сізде #{active_ticket.id} ашық өтініш бар. Жаңа хабарламаңызды "
             "осында жазыңыз, мен операторға жіберемін."
         )
         await callback.answer()
@@ -104,7 +104,7 @@ async def ask_support_question(callback: CallbackQuery, state: FSMContext) -> No
             last_question,
             user_override=callback.from_user,
         )
-        await callback.answer("Тикет создан / Тикет құрылды")
+        await callback.answer("Обращение создано / Өтініш құрылды")
         return
 
     await callback.message.answer(
@@ -130,7 +130,7 @@ async def take_ticket(callback: CallbackQuery) -> None:
     ticket = await assign_ticket(ticket_id, user.id, user.full_name)
 
     if ticket is None:
-        await callback.answer("Тикет не найден", show_alert=True)
+        await callback.answer("Обращение не найдено", show_alert=True)
         return
 
     ticket = await ensure_ticket_topic(callback, ticket) or ticket
@@ -142,7 +142,7 @@ async def take_ticket(callback: CallbackQuery) -> None:
     if ticket.admin_thread_id is None:
         await callback.message.edit_text(
             (
-                f"Ticket #{ticket.id} взят в работу\n"
+                f"Обращение #{ticket.id} взято в работу\n"
                 f"Оператор: {user.full_name}\n"
                 "Ветка не создана: включите Topics и право бота управлять темами."
             ),
@@ -150,15 +150,15 @@ async def take_ticket(callback: CallbackQuery) -> None:
         )
     elif callback.message.message_thread_id == ticket.admin_thread_id:
         await callback.message.answer(
-            f"Тикет #{ticket.id} взял(а) в работу: {user.full_name}.\n"
+            f"Обращение #{ticket.id} взял(а) в работу: {user.full_name}.\n"
             "Теперь пишите обычные сообщения в этой ветке."
         )
     else:
         await cleanup_general_ticket_message(callback, ticket.id, topic_url)
     await callback.bot.send_message(
         ticket.user_id,
-        f"Оператор взял тикет #{ticket.id} в работу.\n"
-        f"Оператор #{ticket.id} тикетін жұмысқа алды.",
+        f"Оператор взял обращение #{ticket.id} в работу.\n"
+        f"Оператор #{ticket.id} өтінішін жұмысқа алды.",
     )
     await callback.answer("Взято в работу")
 
@@ -169,15 +169,15 @@ async def close_ticket_callback(callback: CallbackQuery) -> None:
     ticket = await close_ticket(ticket_id)
 
     if ticket is None:
-        await callback.answer("Тикет не найден", show_alert=True)
+        await callback.answer("Обращение не найдено", show_alert=True)
         return
 
     await mark_callback_message_closed(callback)
-    await callback.message.answer(f"Тикет #{ticket.id} закрыт.")
+    await callback.message.answer(f"Обращение #{ticket.id} закрыто.")
     await callback.bot.send_message(
         ticket.user_id,
-        f"Тикет #{ticket.id} закрыт. Спасибо за обращение!\n"
-        f"#{ticket.id} тикеті жабылды. Хабарласқаныңызға рақмет!",
+        f"Обращение #{ticket.id} закрыто. Спасибо!\n"
+        f"#{ticket.id} өтініші жабылды. Хабарласқаныңызға рақмет!",
         reply_markup=main_menu_keyboard(),
     )
     await maybe_close_topic(callback)
@@ -196,7 +196,7 @@ async def send_canned_response(callback: CallbackQuery) -> None:
 
     ticket = await get_ticket(ticket_id)
     if ticket is None or ticket.status == "closed":
-        await callback.answer("Тикет не найден или закрыт", show_alert=True)
+        await callback.answer("Обращение не найдено или закрыто", show_alert=True)
         return
 
     operator = callback.from_user
@@ -212,7 +212,7 @@ async def send_canned_response(callback: CallbackQuery) -> None:
         text=response,
     )
     await callback.message.answer(
-        f"Быстрый ответ отправлен пользователю по тикету #{ticket.id}."
+        f"Быстрый ответ отправлен пользователю по обращению #{ticket.id}."
     )
     await callback.answer("Отправлено")
 
@@ -315,8 +315,8 @@ async def forward_user_photo_to_operator(message: Message) -> None:
     ticket = await get_active_ticket_by_user(user.id)
     if ticket is None:
         await message.answer(
-            "Сначала создайте тикет оператору, потом отправьте скриншот сюда.\n"
-            "Алдымен операторға тикет ашыңыз, содан кейін скриншотты осында жіберіңіз.",
+            "Сначала создайте обращение оператору, потом отправьте скриншот сюда.\n"
+            "Алдымен операторға өтініш ашыңыз, содан кейін скриншотты осында жіберіңіз.",
             reply_markup=main_menu_keyboard(),
         )
         return
@@ -336,7 +336,7 @@ async def forward_user_photo_to_operator(message: Message) -> None:
         message,
         ticket.id,
         (
-            f"Фото от пользователя по тикету #{ticket.id}\n"
+            f"Фото от пользователя по обращению #{ticket.id}\n"
             f"TICKET_ID: {ticket.id}\n"
             f"Пользователь: {user.full_name}\n\n"
             f"{caption}"
@@ -377,7 +377,7 @@ async def forward_user_message_to_operator(message: Message, state: FSMContext) 
         message,
         ticket.id,
         (
-            f"Сообщение от пользователя по тикету #{ticket.id}\n"
+            f"Сообщение от пользователя по обращению #{ticket.id}\n"
             f"TICKET_ID: {ticket.id}\n"
             f"Пользователь: {user.full_name}\n\n"
             f"{message.text}"
@@ -425,9 +425,9 @@ async def answer_with_rag(message: Message, state: FSMContext) -> None:
     await message.answer(
         pick(
             language,
-            "Если ответ не помог, можно создать тикет оператору или вернуться в "
+            "Если ответ не помог, можно создать обращение оператору или вернуться в "
             "меню.",
-            "Жауап көмектеспесе, операторға тикет ашуға немесе мәзірге оралуға "
+            "Жауап көмектеспесе, операторға өтініш ашуға немесе мәзірге оралуға "
             "болады.",
         ),
         reply_markup=after_ai_keyboard(show_duty=not is_work_time()),
@@ -467,7 +467,7 @@ async def create_support_ticket(
             message,
             active_ticket.id,
             (
-                f"Новое сообщение по тикету #{active_ticket.id}\n"
+                f"Новое сообщение по обращению #{active_ticket.id}\n"
                 f"TICKET_ID: {active_ticket.id}\n"
                 f"Пользователь: {user_name}\n\n"
                 f"{question}"
@@ -477,8 +477,8 @@ async def create_support_ticket(
         )
         await state.clear()
         await message.answer(
-            f"Сообщение добавлено в тикет #{active_ticket.id}.\n"
-            f"Хабарлама #{active_ticket.id} тикетіне қосылды.",
+            f"Сообщение добавлено в обращение #{active_ticket.id}.\n"
+            f"Хабарлама #{active_ticket.id} өтінішіне қосылды.",
             reply_markup=ReplyKeyboardRemove(),
         )
         return
@@ -507,16 +507,16 @@ async def create_support_ticket(
     except Exception:
         logger.exception("Cannot create support ticket")
         await message.answer(
-            "Не удалось создать тикет. Попробуйте чуть позже.\n"
-            "Тикет құру мүмкін болмады. Кейінірек қайталап көріңіз.",
+            "Не удалось создать обращение. Попробуйте чуть позже.\n"
+            "Өтініш құру мүмкін болмады. Кейінірек қайталап көріңіз.",
             reply_markup=ReplyKeyboardRemove(),
         )
         return
 
     await state.clear()
     await message.answer(
-        f"Тикет #{ticket.id} создан. Оператор ответит в этом чате.\n"
-        f"#{ticket.id} тикеті құрылды. Оператор осы чатта жауап береді.",
+        f"Обращение #{ticket.id} создано. Оператор ответит в этом чате.\n"
+        f"#{ticket.id} өтініші құрылды. Оператор осы чатта жауап береді.",
         reply_markup=ReplyKeyboardRemove(),
     )
     await message.answer(
@@ -624,7 +624,7 @@ async def cleanup_general_ticket_message(
         logger.exception("Cannot delete General ticket card, editing instead")
 
     await callback.message.edit_text(
-        f"Ticket #{ticket_id} открыт в отдельной ветке.",
+        f"Обращение #{ticket_id} открыто в отдельной ветке.",
         reply_markup=ticket_open_keyboard(ticket_id, topic_url),
     )
 
@@ -697,7 +697,7 @@ async def send_operator_text_to_user(
 ) -> None:
     ticket = await get_ticket(ticket_id)
     if ticket is None or ticket.status == "closed":
-        await bot_message.answer("Тикет не найден или уже закрыт.")
+        await bot_message.answer("Обращение не найдено или уже закрыто.")
         return
 
     await add_message(ticket.id, "operator", operator_id, operator_name, text)
@@ -705,7 +705,7 @@ async def send_operator_text_to_user(
     if ticket.status == "open":
         ticket = await assign_ticket(ticket.id, operator_id, operator_name) or ticket
 
-    for chunk in split_long_message(f"Оператор по тикету #{ticket.id}:\n\n{text}"):
+    for chunk in split_long_message(f"Оператор по обращению #{ticket.id}:\n\n{text}"):
         await bot_message.bot.send_message(ticket.user_id, chunk)
 
 
@@ -718,7 +718,7 @@ async def send_operator_photo_to_user(
 ) -> None:
     ticket = await get_ticket(ticket_id)
     if ticket is None or ticket.status == "closed":
-        await bot_message.answer("Тикет не найден или уже закрыт.")
+        await bot_message.answer("Обращение не найдено или уже закрыто.")
         return
     if not bot_message.photo:
         return
@@ -728,7 +728,7 @@ async def send_operator_photo_to_user(
     if ticket.status == "open":
         ticket = await assign_ticket(ticket.id, operator_id, operator_name) or ticket
 
-    user_caption = f"Оператор по тикету #{ticket.id}"
+    user_caption = f"Оператор по обращению #{ticket.id}"
     if caption:
         user_caption = f"{user_caption}:\n\n{caption}"
 
@@ -789,7 +789,7 @@ def build_ticket_text(
         "право управлять темами."
     )
     return (
-        f"Новый тикет #{ticket_id}\n"
+        f"Новое обращение #{ticket_id}\n"
         f"TICKET_ID: {ticket_id}\n"
         f"USER_ID: {user_id}\n"
         f"Пользователь: {user_name}\n"
@@ -815,14 +815,14 @@ def build_general_ticket_text(
         short_question = f"{short_question[:177]}..."
 
     return (
-        f"Новый тикет #{ticket_id}\n"
+        f"Новое обращение #{ticket_id}\n"
         f"TICKET_ID: {ticket_id}\n"
         f"USER_ID: {user_id}\n"
         f"Пользователь: {user_name}\n"
         f"Username: {username_text}\n"
         "Статус: open\n\n"
         f"Вопрос: {short_question}\n\n"
-        "Нажмите 'Взять в работу', чтобы открыть отдельную ветку тикета."
+        "Нажмите 'Взять в работу', чтобы открыть отдельную ветку обращения."
     )
 
 
@@ -837,7 +837,7 @@ def build_message_url(chat_id: int | None, message_id: int | None) -> str | None
 
 
 def build_topic_name(ticket_id: int, user_name: str, question: str) -> str:
-    return f"Ticket #{ticket_id}"
+    return f"Обращение #{ticket_id}"
 
 
 def parse_ticket_id(text: str) -> int | None:
