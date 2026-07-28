@@ -8,7 +8,7 @@ from aiogram.types import FSInputFile
 from aiogram.types import CallbackQuery, Message
 
 from config import get_settings
-from keyboards.inline import language_keyboard, main_menu_keyboard
+from keyboards.inline import back_to_menu_keyboard, language_keyboard, main_menu_keyboard
 from services.reports import build_daily_ticket_report
 from services.ticket_storage import get_user_language, set_user_language
 
@@ -150,7 +150,7 @@ async def show_phonebook(callback: CallbackQuery) -> None:
         "535 - Асхат (Симбейс бойынша)\n"
         "477 - Абылайхан"
     )
-    await callback.message.edit_text(text, reply_markup=main_menu_keyboard())
+    await callback.message.edit_text(text, reply_markup=back_to_menu_keyboard())
     await callback.answer()
 
 

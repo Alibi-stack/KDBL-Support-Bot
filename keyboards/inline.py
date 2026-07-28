@@ -21,7 +21,7 @@ def main_menu_keyboard() -> InlineKeyboardMarkup:
                     callback_data="ask_ai",
                 )
             ],
-            [InlineKeyboardButton(text="FAQ", callback_data="faq")],
+            [InlineKeyboardButton(text="FAQ (частые вопросы)", callback_data="faq")],
             [
                 InlineKeyboardButton(
                     text="Сменить язык / Тілді ауыстыру",
