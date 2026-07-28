@@ -149,7 +149,7 @@ async def take_ticket(callback: CallbackQuery) -> None:
     if ticket.admin_thread_id is None:
         await callback.message.edit_text(
             (
-                f"Обращение #{ticket.id} взято в работу\n"
+                f"Тикет #{ticket.id} взят в работу\n"
                 f"Оператор: {user.full_name}\n"
                 "Ветка не создана: включите Topics и право бота управлять темами."
             ),
@@ -157,7 +157,7 @@ async def take_ticket(callback: CallbackQuery) -> None:
         )
     elif callback.message.message_thread_id == ticket.admin_thread_id:
         await callback.message.answer(
-            f"Обращение #{ticket.id} взял(а) в работу: {user.full_name}.\n"
+            f"Тикет #{ticket.id} взял(а) в работу: {user.full_name}.\n"
             "Теперь пишите обычные сообщения в этой ветке."
         )
     else:
@@ -179,8 +179,10 @@ async def close_ticket_callback(callback: CallbackQuery) -> None:
         await callback.answer("Обращение не найдено", show_alert=True)
         return
 
-    await mark_callback_message_closed(callback)
-    await callback.message.answer(f"Обращение #{ticket.id} закрыто.")
+    deleted_callback_message = await delete_callback_message_if_general(callback)
+    if not deleted_callback_message:
+        await mark_callback_message_closed(callback)
+    await callback.message.answer(f"Тикет #{ticket.id} закрыт.")
     await callback.bot.send_message(
         ticket.user_id,
         f"Обращение #{ticket.id} закрыто. Спасибо!\n"
@@ -219,7 +221,7 @@ async def send_canned_response(callback: CallbackQuery) -> None:
         text=response,
     )
     await callback.message.answer(
-        f"Быстрый ответ отправлен пользователю по обращению #{ticket.id}."
+        f"Быстрый ответ отправлен пользователю по тикету #{ticket.id}."
     )
     await callback.answer("Отправлено")
 
@@ -352,7 +354,7 @@ async def forward_user_photo_to_operator(message: Message) -> None:
         message,
         ticket.id,
         (
-            f"Фото от пользователя по обращению #{ticket.id}\n"
+            f"Фото от пользователя по тикету #{ticket.id}\n"
             f"TICKET_ID: {ticket.id}\n"
             f"Пользователь: {user.full_name}\n\n"
             f"{caption}"
@@ -393,7 +395,7 @@ async def forward_user_message_to_operator(message: Message, state: FSMContext) 
         message,
         ticket.id,
         (
-            f"Сообщение от пользователя по обращению #{ticket.id}\n"
+            f"Сообщение от пользователя по тикету #{ticket.id}\n"
             f"TICKET_ID: {ticket.id}\n"
             f"Пользователь: {user.full_name}\n\n"
             f"{message.text}"
@@ -483,7 +485,7 @@ async def create_support_ticket(
             message,
             active_ticket.id,
             (
-                f"Новое сообщение по обращению #{active_ticket.id}\n"
+                f"Новое сообщение по тикету #{active_ticket.id}\n"
                 f"TICKET_ID: {active_ticket.id}\n"
                 f"Пользователь: {user_name}\n\n"
                 f"{question}"
@@ -640,7 +642,7 @@ async def cleanup_general_ticket_message(
         logger.exception("Cannot delete General ticket card, editing instead")
 
     await callback.message.edit_text(
-        f"Обращение #{ticket_id} открыто в отдельной ветке.",
+        f"Тикет #{ticket_id} открыт в отдельной ветке.",
         reply_markup=ticket_open_keyboard(ticket_id, topic_url),
     )
 
@@ -671,6 +673,18 @@ async def mark_callback_message_closed(callback: CallbackQuery) -> None:
         await message.edit_reply_markup(reply_markup=None)
     except TelegramBadRequest:
         logger.exception("Cannot remove closed ticket keyboard")
+
+
+async def delete_callback_message_if_general(callback: CallbackQuery) -> bool:
+    if callback.message.message_thread_id is not None:
+        return False
+
+    try:
+        await callback.message.delete()
+        return True
+    except TelegramBadRequest:
+        logger.exception("Cannot delete closed General ticket card")
+        return False
 
 
 async def ensure_ticket_topic(callback: CallbackQuery, ticket) -> object | None:
@@ -713,7 +727,7 @@ async def send_operator_text_to_user(
 ) -> None:
     ticket = await get_ticket(ticket_id)
     if ticket is None or ticket.status == "closed":
-        await bot_message.answer("Обращение не найдено или уже закрыто.")
+        await bot_message.answer("Тикет не найден или уже закрыт.")
         return
 
     await add_message(ticket.id, "operator", operator_id, operator_name, text)
@@ -734,7 +748,7 @@ async def send_operator_photo_to_user(
 ) -> None:
     ticket = await get_ticket(ticket_id)
     if ticket is None or ticket.status == "closed":
-        await bot_message.answer("Обращение не найдено или уже закрыто.")
+        await bot_message.answer("Тикет не найден или уже закрыт.")
         return
     if not bot_message.photo:
         return
@@ -805,7 +819,7 @@ def build_ticket_text(
         "право управлять темами."
     )
     return (
-        f"Новое обращение #{ticket_id}\n"
+        f"Новый тикет #{ticket_id}\n"
         f"TICKET_ID: {ticket_id}\n"
         f"USER_ID: {user_id}\n"
         f"Пользователь: {user_name}\n"
@@ -831,14 +845,14 @@ def build_general_ticket_text(
         short_question = f"{short_question[:177]}..."
 
     return (
-        f"Новое обращение #{ticket_id}\n"
+        f"Новый тикет #{ticket_id}\n"
         f"TICKET_ID: {ticket_id}\n"
         f"USER_ID: {user_id}\n"
         f"Пользователь: {user_name}\n"
         f"Username: {username_text}\n"
         "Статус: open\n\n"
         f"Вопрос: {short_question}\n\n"
-        "Нажмите 'Взять в работу', чтобы открыть отдельную ветку обращения."
+        "Нажмите 'Взять в работу', чтобы открыть отдельную ветку тикета."
     )
 
 
@@ -853,7 +867,7 @@ def build_message_url(chat_id: int | None, message_id: int | None) -> str | None
 
 
 def build_topic_name(ticket_id: int, user_name: str, question: str) -> str:
-    return f"Обращение #{ticket_id}"
+    return f"Ticket #{ticket_id}"
 
 
 def parse_ticket_id(text: str) -> int | None:

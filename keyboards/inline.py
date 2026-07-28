@@ -151,7 +151,7 @@ def ticket_open_keyboard(ticket_id: int, topic_url: str | None) -> InlineKeyboar
         buttons.append(
             [
                 InlineKeyboardButton(
-                    text=f"Открыть обращение #{ticket_id}",
+                    text=f"Открыть тикет #{ticket_id}",
                     url=topic_url,
                 )
             ]
