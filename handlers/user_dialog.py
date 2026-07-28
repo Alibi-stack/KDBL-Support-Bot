@@ -164,7 +164,15 @@ def clean_ai_answer(answer: str) -> str:
         " ",
         cleaned,
     ).strip()
+    cleaned = remove_cjk_noise(cleaned)
     return cleaned or "Готов помочь. Напишите вопрос чуть подробнее."
+
+
+def remove_cjk_noise(text: str) -> str:
+    text = re.sub(r"[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]", "", text)
+    text = re.sub(r"[ \t]{2,}", " ", text)
+    text = re.sub(r" ?\n ?", "\n", text)
+    return text.strip()
 
 
 def ai_unavailable_text(language: str) -> str:
