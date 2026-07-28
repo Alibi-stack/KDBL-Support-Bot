@@ -2,6 +2,7 @@ import asyncio
 import logging
 
 from aiogram import Bot, Dispatcher
+from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.exceptions import TelegramNetworkError
 from aiogram.fsm.storage.memory import MemoryStorage
 
@@ -19,15 +20,19 @@ async def main() -> None:
     settings = get_settings()
     await init_db()
 
-    bot = Bot(token=settings.bot_token)
+    session = AiohttpSession(timeout=15)
+    bot = Bot(token=settings.bot_token, session=session)
     dispatcher = Dispatcher(storage=MemoryStorage())
     dispatcher.include_router(setup_routers())
 
     while True:
         try:
+            logging.info("Checking Telegram connection...")
+            me = await asyncio.wait_for(bot.get_me(), timeout=20)
+            logging.info("Telegram connection OK: @%s", me.username)
             await dispatcher.start_polling(bot)
-        except TelegramNetworkError:
-            logging.exception("Telegram network error, retrying in 5 seconds")
+        except (TelegramNetworkError, TimeoutError, asyncio.TimeoutError, OSError):
+            logging.exception("Telegram connection problem, retrying in 5 seconds")
             await asyncio.sleep(5)
 
 
