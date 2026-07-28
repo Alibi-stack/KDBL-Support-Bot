@@ -204,12 +204,35 @@ async def transfer_ticket(callback: CallbackQuery) -> None:
         return
 
     try:
-        await callback.message.edit_reply_markup(reply_markup=ticket_claim_keyboard(ticket.id))
+        keyboard = (
+            ticket_keyboard(ticket.id)
+            if callback.message.message_thread_id is not None
+            else ticket_claim_keyboard(ticket.id)
+        )
+        await callback.message.edit_reply_markup(reply_markup=keyboard)
     except TelegramBadRequest:
-        logger.exception("Cannot switch ticket keyboard to claim mode")
+        logger.exception("Cannot keep transferred topic keyboard")
+
+    settings = get_settings()
+    if settings.admin_chat_id is not None and callback.message.message_thread_id is not None:
+        try:
+            admin_message = await callback.bot.send_message(
+                settings.admin_chat_id,
+                build_general_ticket_text(
+                    ticket.id,
+                    ticket.user_id,
+                    ticket.user_name,
+                    ticket.username,
+                    ticket.question,
+                ),
+                reply_markup=ticket_claim_keyboard(ticket.id),
+            )
+            await set_ticket_admin_message(ticket.id, admin_message.message_id)
+        except TelegramBadRequest:
+            logger.exception("Cannot publish transferred ticket to General")
 
     await callback.message.answer(
-        f"Тикет #{ticket.id} передан. Теперь другой оператор может взять его в работу."
+        f"Тикет #{ticket.id} передан. Карточка снова отправлена в General, другой оператор может взять его в работу."
     )
     await callback.answer("Передано")
 

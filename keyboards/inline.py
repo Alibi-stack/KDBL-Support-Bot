@@ -82,10 +82,6 @@ def ticket_keyboard(ticket_id: int) -> InlineKeyboardMarkup:
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="Взять в работу",
-                    callback_data=f"ticket_take:{ticket_id}",
-                ),
-                InlineKeyboardButton(
                     text="Передать",
                     callback_data=f"ticket_transfer:{ticket_id}",
                 ),
@@ -160,10 +156,6 @@ def ticket_claim_keyboard(ticket_id: int) -> InlineKeyboardMarkup:
                 InlineKeyboardButton(
                     text="Взять в работу",
                     callback_data=f"ticket_take:{ticket_id}",
-                ),
-                InlineKeyboardButton(
-                    text="Передать",
-                    callback_data=f"ticket_transfer:{ticket_id}",
                 ),
                 InlineKeyboardButton(
                     text="Закрыть",
