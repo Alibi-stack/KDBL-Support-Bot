@@ -56,9 +56,13 @@ AI_PROVIDER=stub
 AI_PROVIDER=groq
 GROQ_API_KEY=...
 GROQ_MODEL=llama-3.3-70b-versatile
+USE_VECTOR_RAG=false
 ```
 
 Groq подключен через официальный пакет `groq`.
+По умолчанию используется быстрый поиск по ключевым словам в `knowledge_base.json`.
+Векторный RAG через HuggingFace можно включить позже через `USE_VECTOR_RAG=true`,
+но первый запуск будет заметно дольше.
 
 ## Операторская группа
 

@@ -100,7 +100,7 @@ def _get_collection():
 def retrieve_relevant_faq(query: str, top_k: int = 3) -> list[dict]:
     """Возвращает top_k релевантных FAQ-статей целиком (с полным answer)."""
     lexical_matches = retrieve_relevant_faq_lexical(query, top_k=top_k)
-    if lexical_matches:
+    if lexical_matches or not get_settings().use_vector_rag:
         return lexical_matches
 
     try:

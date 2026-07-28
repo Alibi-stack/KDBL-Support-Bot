@@ -7,7 +7,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     bot_token: str = Field(alias="BOT_TOKEN")
     admin_chat_id: int | None = Field(default=None, alias="ADMIN_CHAT_ID")
-    ai_request_timeout: int = Field(default=30, alias="AI_REQUEST_TIMEOUT")
+    ai_request_timeout: int = Field(default=60, alias="AI_REQUEST_TIMEOUT")
     database_path: str = Field(default="support.db", alias="DATABASE_PATH")
     ai_provider: str = Field(default="stub", alias="AI_PROVIDER")
     groq_api_key: str | None = Field(default=None, alias="GROQ_API_KEY")
@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     use_forum_topics: bool = Field(default=True, alias="USE_FORUM_TOPICS")
     kb_path: str = Field(default="knowledge_base.json", alias="KB_PATH")
     chroma_dir: str = Field(default="./chroma_store", alias="CHROMA_DIR")
+    use_vector_rag: bool = Field(default=False, alias="USE_VECTOR_RAG")
 
     @field_validator("admin_chat_id", mode="before")
     @classmethod

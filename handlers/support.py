@@ -9,7 +9,12 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message, ReplyKeyboardRemove
 
 from config import get_settings
-from handlers.user_dialog import AI_UNAVAILABLE_TEXT, clean_ai_answer, save_ai_history
+from handlers.user_dialog import (
+    AI_UNAVAILABLE_TEXT,
+    clean_ai_answer,
+    safe_edit_or_answer,
+    save_ai_history,
+)
 from keyboards.inline import (
     after_ai_keyboard,
     main_menu_keyboard,
@@ -381,7 +386,6 @@ async def answer_with_rag(message: Message, state: FSMContext) -> None:
     пока у него нет открытого тикета оператору. Если AI недоступен или
     ошибся — вежливо сообщаем об этом и предлагаем создать тикет, а не
     роняем обработчик."""
-    settings = get_settings()
     data = await state.get_data()
     history = data.get("ai_history", [])
 
@@ -392,10 +396,7 @@ async def answer_with_rag(message: Message, state: FSMContext) -> None:
     )
 
     try:
-        answer = await asyncio.wait_for(
-            get_ai_response(message.text, history=history),
-            timeout=settings.ai_request_timeout,
-        )
+        answer = await get_ai_response(message.text, history=history)
     except (AIServiceError, TimeoutError, asyncio.TimeoutError):
         logger.exception("AI service failed in support fallback flow")
         answer = AI_UNAVAILABLE_TEXT
@@ -406,11 +407,7 @@ async def answer_with_rag(message: Message, state: FSMContext) -> None:
     answer = clean_ai_answer(answer)
 
     chunks = split_long_message(answer)
-    try:
-        await processing_message.edit_text(chunks[0])
-    except TelegramBadRequest:
-        logger.exception("Cannot edit processing message, sending AI answer separately")
-        await message.answer(chunks[0])
+    await safe_edit_or_answer(processing_message, message, chunks[0])
     for chunk in chunks[1:]:
         await message.answer(chunk)
 

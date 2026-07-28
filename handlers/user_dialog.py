@@ -8,7 +8,6 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message, ReplyKeyboardRemove
 
-from config import get_settings
 from keyboards.inline import after_ai_keyboard, main_menu_keyboard
 from keyboards.reply import cancel_keyboard
 from services.ai_client import AIServiceError, get_ai_response
@@ -49,7 +48,6 @@ async def cancel_dialog(message: Message, state: FSMContext) -> None:
 
 @router.message(UserDialog.waiting_question, F.text)
 async def handle_ai_question(message: Message, state: FSMContext) -> None:
-    settings = get_settings()
     data = await state.get_data()
     history = data.get("ai_history", [])
     await message.bot.send_chat_action(message.chat.id, ChatAction.TYPING)
@@ -60,27 +58,20 @@ async def handle_ai_question(message: Message, state: FSMContext) -> None:
     )
 
     try:
-        answer = await asyncio.wait_for(
-            get_ai_response(message.text, history=history),
-            timeout=settings.ai_request_timeout,
-        )
+        answer = await get_ai_response(message.text, history=history)
     except (AIServiceError, TimeoutError, asyncio.TimeoutError):
         logger.exception("AI service failed")
-        await processing_message.edit_text(AI_UNAVAILABLE_TEXT)
+        await safe_edit_or_answer(processing_message, message, AI_UNAVAILABLE_TEXT)
         return
     except Exception:
         logger.exception("Unexpected AI handler error")
-        await processing_message.edit_text(AI_UNAVAILABLE_TEXT)
+        await safe_edit_or_answer(processing_message, message, AI_UNAVAILABLE_TEXT)
         return
 
     answer = clean_ai_answer(answer)
 
     chunks = split_long_message(answer)
-    try:
-        await processing_message.edit_text(chunks[0])
-    except TelegramBadRequest:
-        logger.exception("Cannot edit processing message, sending AI answer separately")
-        await message.answer(chunks[0])
+    await safe_edit_or_answer(processing_message, message, chunks[0])
     for chunk in chunks[1:]:
         await message.answer(chunk)
 
@@ -117,6 +108,18 @@ async def save_ai_history(
         {"role": "assistant", "content": ai_text},
     ][-8:]
     await state.update_data(last_question=user_text, ai_history=updated_history)
+
+
+async def safe_edit_or_answer(
+    processing_message: Message,
+    original_message: Message,
+    text: str,
+) -> None:
+    try:
+        await processing_message.edit_text(text)
+    except TelegramBadRequest:
+        logger.exception("Cannot edit processing message, sending text separately")
+        await original_message.answer(text)
 
 
 def clean_ai_answer(answer: str) -> str:
