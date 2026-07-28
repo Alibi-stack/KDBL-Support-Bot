@@ -83,7 +83,12 @@ async def ask_support_question(callback: CallbackQuery, state: FSMContext) -> No
     await state.set_state(UserDialog.waiting_support_question)
 
     if last_question:
-        await create_support_ticket(callback.message, state, last_question)
+        await create_support_ticket(
+            callback.message,
+            state,
+            last_question,
+            user_override=callback.from_user,
+        )
         await callback.answer("Тикет создан / Тикет құрылды")
         return
 
@@ -312,6 +317,7 @@ async def create_support_ticket(
     message: Message,
     state: FSMContext,
     question: str,
+    user_override=None,
 ) -> None:
     settings = get_settings()
 
@@ -325,7 +331,7 @@ async def create_support_ticket(
         )
         return
 
-    user = message.from_user
+    user = user_override or message.from_user
     if user is not None and user.is_bot:
         return
 
