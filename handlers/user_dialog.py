@@ -8,7 +8,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message, ReplyKeyboardRemove
 
 from config import get_settings
-from keyboards.inline import human_support_keyboard, main_menu_keyboard
+from keyboards.inline import after_ai_keyboard, human_support_keyboard, main_menu_keyboard
 from keyboards.reply import cancel_keyboard
 from services.ai_client import AIServiceError, get_ai_response
 from states.user_states import UserDialog
@@ -93,7 +93,12 @@ async def handle_ai_question(message: Message, state: FSMContext) -> None:
     for chunk in chunks[1:]:
         await message.answer(chunk)
 
-    await message.answer("Что дальше? / Әрі қарай?", reply_markup=main_menu_keyboard())
+    await state.update_data(last_question=message.text)
+    await message.answer(
+        "Если ответ AI не помог, можно создать тикет оператору.\n"
+        "AI жауабы көмектеспесе, операторға тикет ашуға болады.",
+        reply_markup=after_ai_keyboard(),
+    )
 
 
 @router.message(UserDialog.waiting_question)

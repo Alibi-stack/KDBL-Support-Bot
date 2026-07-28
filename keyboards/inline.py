@@ -10,13 +10,27 @@ def main_menu_keyboard() -> InlineKeyboardMarkup:
                     callback_data="ask_ai",
                 )
             ],
+            [InlineKeyboardButton(text="FAQ", callback_data="faq")],
+        ]
+    )
+
+
+def after_ai_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
             [
-                InlineKeyboardButton(text="FAQ", callback_data="faq"),
                 InlineKeyboardButton(
-                    text="Оператор / Оператормен байланысу",
+                    text="Создать тикет оператору",
                     callback_data="human_support",
-                ),
+                )
             ],
+            [
+                InlineKeyboardButton(
+                    text="Спросить AI еще раз",
+                    callback_data="ask_ai",
+                )
+            ],
+            [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")],
         ]
     )
 
