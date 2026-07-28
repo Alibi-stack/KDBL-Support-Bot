@@ -124,6 +124,12 @@ def ticket_keyboard(ticket_id: int) -> InlineKeyboardMarkup:
                     callback_data=f"ticket_tpl:{ticket_id}:done",
                 ),
             ],
+            [
+                InlineKeyboardButton(
+                    text="Номера сотрудников",
+                    callback_data=f"ticket_tpl:{ticket_id}:phonebook",
+                ),
+            ],
         ]
     )
 

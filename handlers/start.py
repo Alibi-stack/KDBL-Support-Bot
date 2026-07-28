@@ -139,22 +139,10 @@ async def change_language(callback: CallbackQuery) -> None:
 @router.callback_query(F.data == "phonebook")
 async def show_phonebook(callback: CallbackQuery) -> None:
     language = await get_callback_language(callback)
-    text = (
-        "Справочник номеров операторов:\n\n"
-        "700 - Дархан (Lotus, Metadoc, технические вопросы)\n"
-        "535 - Асхат (Simbase)\n"
-        "534 - Абдулла (Simbase)\n"
-        "474 - Олжас (Simbase)\n"
-        "477 - Абылайхан (Metadoc)"
-        if language == "ru"
-        else "Операторлар нөмірлерінің анықтамалығы:\n\n"
-        "700 - Дархан (Lotus, Metadoc, техникалық сұрақтар)\n"
-        "535 - Асхат (Simbase)\n"
-        "534 - Абдулла (Simbase)\n"
-        "474 - Олжас (Simbase)\n"
-        "477 - Абылайхан (Metadoc)"
+    await callback.message.edit_text(
+        build_phonebook_text(language),
+        reply_markup=back_to_menu_keyboard(),
     )
-    await callback.message.edit_text(text, reply_markup=back_to_menu_keyboard())
     await callback.answer()
 
 
@@ -175,6 +163,26 @@ async def get_callback_language(callback: CallbackQuery) -> str:
 
 def get_welcome_text(language: str | None) -> str:
     return WELCOME_TEXTS.get(language or "ru", WELCOME_TEXTS["ru"])
+
+
+def build_phonebook_text(language: str) -> str:
+    if language == "kz":
+        return (
+            "Операторлар нөмірлерінің анықтамалығы:\n\n"
+            "700 - Дархан (Lotus, Metadoc, техникалық сұрақтар)\n"
+            "535 - Асхат (Simbase)\n"
+            "534 - Абдулла (Simbase)\n"
+            "474 - Олжас (Simbase)\n"
+            "477 - Абылайхан (Metadoc)"
+        )
+    return (
+        "Справочник номеров операторов:\n\n"
+        "700 - Дархан (Lotus, Metadoc, технические вопросы)\n"
+        "535 - Асхат (Simbase)\n"
+        "534 - Абдулла (Simbase)\n"
+        "474 - Олжас (Simbase)\n"
+        "477 - Абылайхан (Metadoc)"
+    )
 
 
 def build_duty_text(language: str) -> str:

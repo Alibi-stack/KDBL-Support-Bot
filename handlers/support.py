@@ -8,7 +8,12 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message, ReplyKeyboardRemove
 
 from config import get_settings
-from handlers.start import build_duty_text, get_callback_language, is_work_time
+from handlers.start import (
+    build_duty_text,
+    build_phonebook_text,
+    get_callback_language,
+    is_work_time,
+)
 from handlers.user_dialog import (
     AI_UNAVAILABLE_TEXT,
     clean_ai_answer,
@@ -69,6 +74,7 @@ CANNED_RESPONSES = {
         "Мәселе шешілді ме, тексеріп жіберіңіз. Егер бәрі жұмыс істесе, өтінішті "
         "жабамыз."
     ),
+    "phonebook": build_phonebook_text("ru"),
 }
 
 
