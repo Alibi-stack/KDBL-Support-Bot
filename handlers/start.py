@@ -141,14 +141,14 @@ async def show_phonebook(callback: CallbackQuery) -> None:
     language = await get_callback_language(callback)
     text = (
         "Справочник номеров операторов:\n\n"
-        "700 - Дархан\n"
+        "700 - Дархан (Lotus, Metadoc, принтеры и железо)\n"
         "535 - Асхат (по Симбейс)\n"
-        "477 - Абылайхан (по Метадок)"
+        "477 - Абылайхан"
         if language == "ru"
         else "Операторлар нөмірлерінің анықтамалығы:\n\n"
-        "700 - Дархан\n"
+        "700 - Дархан (Lotus, Metadoc, принтерлер және жабдық)\n"
         "535 - Асхат (Симбейс бойынша)\n"
-        "477 - Абылайхан (Метадок бойынша)"
+        "477 - Абылайхан"
     )
     await callback.message.edit_text(text, reply_markup=main_menu_keyboard())
     await callback.answer()
