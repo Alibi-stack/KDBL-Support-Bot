@@ -24,6 +24,7 @@ from keyboards.inline import (
 )
 from keyboards.reply import cancel_keyboard
 from services.ai_client import AIServiceError, get_ai_response
+from services.i18n import get_message_language, pick
 from services.ticket_storage import (
     add_message,
     assign_ticket,
@@ -396,6 +397,7 @@ async def answer_with_rag(message: Message, state: FSMContext) -> None:
     роняем обработчик."""
     data = await state.get_data()
     history = data.get("ai_history", [])
+    language = await get_message_language(message)
 
     await message.bot.send_chat_action(message.chat.id, ChatAction.TYPING)
     processing_message = await message.answer(
@@ -421,10 +423,13 @@ async def answer_with_rag(message: Message, state: FSMContext) -> None:
 
     await save_ai_history(state, history, message.text, answer)
     await message.answer(
-        "Если ответ не помог, можно создать тикет оператору или вернуться в "
-        "меню.\n"
-        "Жауап көмектеспесе, операторға тикет ашуға немесе мәзірге оралуға "
-        "болады.",
+        pick(
+            language,
+            "Если ответ не помог, можно создать тикет оператору или вернуться в "
+            "меню.",
+            "Жауап көмектеспесе, операторға тикет ашуға немесе мәзірге оралуға "
+            "болады.",
+        ),
         reply_markup=after_ai_keyboard(),
     )
 

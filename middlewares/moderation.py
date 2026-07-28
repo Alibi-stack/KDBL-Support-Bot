@@ -8,6 +8,7 @@ from typing import Any
 from aiogram import BaseMiddleware
 from aiogram.types import Message, TelegramObject
 
+from services.i18n import get_message_language, pick
 from services.ticket_storage import (
     get_moderation_state,
     set_moderation_state,
@@ -47,12 +48,16 @@ class ModerationMiddleware(BaseMiddleware):
         if muted_until_text:
             muted_until = datetime.fromisoformat(muted_until_text)
             if muted_until > now:
+                language = await get_message_language(event)
                 minutes_left = max(1, int((muted_until - now).total_seconds() // 60))
                 await event.answer(
-                    f"Вы временно ограничены из-за грубой лексики. "
-                    f"Осталось примерно {minutes_left} мин.\n"
-                    f"Дөрекі сөздер үшін уақытша шектеу қойылды. "
-                    f"Шамамен {minutes_left} мин қалды."
+                    pick(
+                        language,
+                        f"Вы временно ограничены из-за грубой лексики. "
+                        f"Осталось примерно {minutes_left} мин.",
+                        f"Дөрекі сөздер үшін уақытша шектеу қойылды. "
+                        f"Шамамен {minutes_left} мин қалды.",
+                    )
                 )
                 return None
 
@@ -60,13 +65,17 @@ class ModerationMiddleware(BaseMiddleware):
             return await handler(event, data)
 
         warnings += 1
+        language = await get_message_language(event)
         if warnings <= MAX_WARNINGS:
             await set_moderation_state(event.from_user.id, warnings, None)
             await event.answer(
-                f"Предупреждение {warnings}/{MAX_WARNINGS}: пожалуйста, без "
-                "матерных слов. После предупреждений будет мут на 30 минут.\n"
-                f"Ескерту {warnings}/{MAX_WARNINGS}: дөрекі сөз қолданбаңыз. "
-                "Ескертулерден кейін 30 минутқа шектеу қойылады."
+                pick(
+                    language,
+                    f"Предупреждение {warnings}/{MAX_WARNINGS}: пожалуйста, без "
+                    "матерных слов. После предупреждений будет мут на 30 минут.",
+                    f"Ескерту {warnings}/{MAX_WARNINGS}: дөрекі сөз қолданбаңыз. "
+                    "Ескертулерден кейін 30 минутқа шектеу қойылады.",
+                )
             )
             return None
 
@@ -77,7 +86,10 @@ class ModerationMiddleware(BaseMiddleware):
             muted_until.isoformat(timespec="seconds"),
         )
         await event.answer(
-            "Вы получили мут на 30 минут за матерные слова.\n"
-            "Дөрекі сөздер үшін 30 минутқа шектеу қойылды."
+            pick(
+                language,
+                "Вы получили мут на 30 минут за матерные слова.",
+                "Дөрекі сөздер үшін 30 минутқа шектеу қойылды.",
+            )
         )
         return None
