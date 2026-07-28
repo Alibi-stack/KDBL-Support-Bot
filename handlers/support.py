@@ -1,19 +1,24 @@
+import asyncio
 import logging
 import re
 
 from aiogram import F, Router
+from aiogram.enums import ChatAction
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message, ReplyKeyboardRemove
 
 from config import get_settings
+from handlers.user_dialog import AI_UNAVAILABLE_TEXT, clean_ai_answer, save_ai_history
 from keyboards.inline import (
+    after_ai_keyboard,
     main_menu_keyboard,
     ticket_claim_keyboard,
     ticket_keyboard,
     ticket_open_keyboard,
 )
 from keyboards.reply import cancel_keyboard
+from services.ai_client import AIServiceError, get_ai_response
 from services.ticket_storage import (
     add_message,
     assign_ticket,
@@ -331,18 +336,17 @@ async def forward_user_photo_to_operator(message: Message) -> None:
 
 
 @router.message(F.chat.type == "private", F.text)
-async def forward_user_message_to_operator(message: Message) -> None:
+async def forward_user_message_to_operator(message: Message, state: FSMContext) -> None:
     user = message.from_user
     if user is None or user.is_bot:
         return
 
     ticket = await get_active_ticket_by_user(user.id)
     if ticket is None:
-        await message.answer(
-            "Выберите действие в меню или нажмите /start.\n"
-            "Мәзірден әрекет таңдаңыз немесе /start басыңыз.",
-            reply_markup=main_menu_keyboard(),
-        )
+        # У пользователя нет открытого тикета оператору: сначала пробуем
+        # ответить через RAG-пайплайн (база знаний + Grok), и только если
+        # это не помогло — предлагаем создать тикет.
+        await answer_with_rag(message, state)
         return
 
     settings = get_settings()
@@ -369,6 +373,54 @@ async def forward_user_message_to_operator(message: Message) -> None:
     await message.answer(
         "Сообщение передано оператору.\n"
         "Хабарлама операторға жіберілді."
+    )
+
+
+async def answer_with_rag(message: Message, state: FSMContext) -> None:
+    """Отвечает пользователю через RAG-пайплайн (knowledge_base.json + Grok),
+    пока у него нет открытого тикета оператору. Если AI недоступен или
+    ошибся — вежливо сообщаем об этом и предлагаем создать тикет, а не
+    роняем обработчик."""
+    settings = get_settings()
+    data = await state.get_data()
+    history = data.get("ai_history", [])
+
+    await message.bot.send_chat_action(message.chat.id, ChatAction.TYPING)
+    processing_message = await message.answer(
+        "Запрос обрабатывается...\n"
+        "Сұраныс өңделіп жатыр..."
+    )
+
+    try:
+        answer = await asyncio.wait_for(
+            get_ai_response(message.text, history=history),
+            timeout=settings.ai_request_timeout,
+        )
+    except (AIServiceError, TimeoutError, asyncio.TimeoutError):
+        logger.exception("AI service failed in support fallback flow")
+        answer = AI_UNAVAILABLE_TEXT
+    except Exception:
+        logger.exception("Unexpected AI handler error in support fallback flow")
+        answer = AI_UNAVAILABLE_TEXT
+
+    answer = clean_ai_answer(answer)
+
+    chunks = split_long_message(answer)
+    try:
+        await processing_message.edit_text(chunks[0])
+    except TelegramBadRequest:
+        logger.exception("Cannot edit processing message, sending AI answer separately")
+        await message.answer(chunks[0])
+    for chunk in chunks[1:]:
+        await message.answer(chunk)
+
+    await save_ai_history(state, history, message.text, answer)
+    await message.answer(
+        "Если ответ не помог, можно создать тикет оператору или вернуться в "
+        "меню.\n"
+        "Жауап көмектеспесе, операторға тикет ашуға немесе мәзірге оралуға "
+        "болады.",
+        reply_markup=after_ai_keyboard(),
     )
 
 

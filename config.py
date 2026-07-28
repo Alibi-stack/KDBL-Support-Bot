@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     groq_api_key: str | None = Field(default=None, alias="GROQ_API_KEY")
     groq_model: str = Field(default="llama-3.3-70b-versatile", alias="GROQ_MODEL")
     use_forum_topics: bool = Field(default=True, alias="USE_FORUM_TOPICS")
+    kb_path: str = Field(default="knowledge_base.json", alias="KB_PATH")
+    chroma_dir: str = Field(default="./chroma_store", alias="CHROMA_DIR")
 
     @field_validator("admin_chat_id", mode="before")
     @classmethod
