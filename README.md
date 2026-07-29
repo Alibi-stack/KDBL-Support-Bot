@@ -51,6 +51,33 @@ docker compose logs -f bot
 - Superset: http://localhost:8088
 - ChromaDB: http://localhost:8000
 
+### Alerts в отдельную тему Telegram
+
+Алерты отправляет Alertmanager через Telegram-бота. По умолчанию чат берётся из
+`ALERT_CHAT_ID`, а если он пустой — из `ADMIN_CHAT_ID`.
+
+Чтобы алерты приходили не в `General`, а в отдельную тему:
+
+1. В группе операторов включите Topics.
+2. Дайте боту право управлять темами.
+3. В группе выполните команду:
+
+```text
+/alerts_topic
+```
+
+Команда покажет или создаст тему `Alerts` и даст значение:
+
+```env
+ALERT_THREAD_ID=...
+```
+
+Добавьте его в `.env`, затем перезапустите Alertmanager:
+
+```powershell
+docker compose up -d --build alertmanager-init alertmanager
+```
+
 Остановить все сервисы:
 
 ```powershell

@@ -2,6 +2,7 @@ from datetime import datetime, time
 from zoneinfo import ZoneInfo
 
 from aiogram import F, Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.types import FSInputFile
@@ -80,6 +81,50 @@ async def command_forum_status(message: Message) -> None:
         "Темы в этой группе не включены. Поэтому обращения падают в General.\n\n"
         "Чтобы были отдельные ветки: настройки группы -> Темы / Topics -> включить. "
         "Боту также нужно право управлять темами."
+    )
+
+
+@router.message(Command("alerts_topic"))
+async def command_alerts_topic(message: Message) -> None:
+    settings = get_settings()
+    if settings.admin_chat_id is None or message.chat.id != settings.admin_chat_id:
+        return
+
+    chat = await message.bot.get_chat(message.chat.id)
+    if not getattr(chat, "is_forum", False):
+        await message.answer(
+            "Темы в этой группе не включены. Сначала включите Topics в настройках "
+            "группы и дайте боту право управлять темами."
+        )
+        return
+
+    if settings.alert_thread_id:
+        await message.answer(
+            "Тема Alerts уже указана в настройках:\n"
+            f"ALERT_THREAD_ID={settings.alert_thread_id}\n\n"
+            "Если алерты всё ещё приходят в General, перезапустите Alertmanager:\n"
+            "docker compose up -d --build alertmanager-init alertmanager"
+        )
+        return
+
+    try:
+        topic = await message.bot.create_forum_topic(
+            chat_id=message.chat.id,
+            name="Alerts",
+            icon_color=0xFF0000,
+        )
+    except TelegramBadRequest:
+        await message.answer(
+            "Не удалось создать тему Alerts. Проверьте, что у бота есть право "
+            "управлять темами."
+        )
+        return
+
+    await message.answer(
+        "Тема Alerts создана. Добавьте это значение в `.env`:\n"
+        f"ALERT_THREAD_ID={topic.message_thread_id}\n\n"
+        "Затем перезапустите Alertmanager:\n"
+        "docker compose up -d --build alertmanager-init alertmanager"
     )
 
 

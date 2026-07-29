@@ -15,7 +15,7 @@ from config import get_settings
 from services.ticket_storage import (
     get_app_state,
     get_tickets_for_period,
-    set_app_state,
+    set_app_state_if_changed,
 )
 
 REPORT_STATE_KEY = "last_daily_report_date"
@@ -42,8 +42,11 @@ async def maybe_send_daily_report(bot: Bot) -> None:
         return
 
     report_date = now.date()
+    report_date_text = report_date.isoformat()
     last_report_date = await get_app_state(REPORT_STATE_KEY)
-    if last_report_date == report_date.isoformat():
+    if last_report_date == report_date_text:
+        return
+    if not await set_app_state_if_changed(REPORT_STATE_KEY, report_date_text):
         return
 
     report_path = await build_daily_ticket_report(report_date)
@@ -52,7 +55,6 @@ async def maybe_send_daily_report(bot: Bot) -> None:
         FSInputFile(report_path),
         caption=f"Ежедневный отчёт по обращениям за {report_date:%d.%m.%Y}",
     )
-    await set_app_state(REPORT_STATE_KEY, report_date.isoformat())
 
 
 async def build_daily_ticket_report(report_date: date) -> Path:

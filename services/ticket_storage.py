@@ -439,6 +439,26 @@ async def set_app_state(key: str, value: str) -> None:
         )
 
 
+async def set_app_state_if_changed(key: str, value: str) -> bool:
+    pool = await _get_pool()
+    async with pool.acquire() as connection:
+        changed = await connection.fetchval(
+            """
+            INSERT INTO app_state (key, value, updated_at)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (key) DO UPDATE SET
+                value = EXCLUDED.value,
+                updated_at = EXCLUDED.updated_at
+            WHERE app_state.value IS DISTINCT FROM EXCLUDED.value
+            RETURNING 1
+            """,
+            key,
+            value,
+            _now(),
+        )
+    return changed == 1
+
+
 async def get_tickets_for_period(
     start_iso: str,
     end_iso: str,

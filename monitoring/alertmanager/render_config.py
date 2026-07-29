@@ -57,6 +57,7 @@ receivers:
     telegram_configs:
       - bot_token: '{bot_token}'
         chat_id: {chat_id or 0}{thread_line}
+        send_resolved: false
         parse_mode: 'HTML'
         message: |-
           {{{{- range .Alerts }}}}

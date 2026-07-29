@@ -51,7 +51,6 @@ async def main() -> None:
     dispatcher = Dispatcher(storage=MemoryStorage())
     dispatcher.message.middleware(RateLimitMiddleware())
     dispatcher.message.middleware(ModerationMiddleware())
-    dispatcher.message.middleware(ModerationMiddleware())
     dispatcher.include_router(setup_routers())
     asyncio.create_task(daily_report_loop(bot))
 
