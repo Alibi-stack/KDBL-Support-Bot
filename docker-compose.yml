@@ -144,14 +144,9 @@ services:
       SUPERSET_ADMIN_PASSWORD: ${SUPERSET_ADMIN_PASSWORD:-admin}
     volumes:
       - ./superset/superset_config.py:/app/pythonpath/superset_config.py:ro
+      - ./superset/init.sh:/app/pythonpath/init.sh:ro
       - superset_home:/app/superset_home
-    entrypoint: /bin/sh
-    command:
-      - -c
-      - |
-        superset db upgrade &&
-        superset fab create-admin --username admin --firstname Admin --lastname Admin --email admin@kdbl.local --password "$$SUPERSET_ADMIN_PASSWORD"
-        superset init
+    entrypoint: ["/bin/sh", "/app/pythonpath/init.sh"]
     restart: "no"
     networks:
       - kdbl-network
