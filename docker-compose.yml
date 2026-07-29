@@ -157,6 +157,9 @@ services:
       - kdbl-network
 
   superset:
+    build:
+      context: ./superset
+      dockerfile: Dockerfile
     image: kdbl-superset:local
     container_name: kdbl-superset
     restart: unless-stopped
