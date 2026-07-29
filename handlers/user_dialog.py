@@ -97,16 +97,18 @@ async def handle_ai_question(message: Message, state: FSMContext) -> None:
         await message.answer(chunk)
 
     await save_ai_history(state, history, message.text, answer)
+    question_count = len(history) // 2 + 1
     await state.set_state(UserDialog.waiting_question)
     await message.answer(
         pick(
             language,
-            "Можете сразу написать следующий вопрос. Если ответ AI не помог, "
-            "создайте обращение оператору.",
-            "Келесі сұрақты бірден жаза аласыз. AI жауабы көмектеспесе, "
-            "операторға өтініш ашыңыз.",
+            build_ai_followup_text(question_count),
+            build_ai_followup_text_kz(question_count),
         ),
-        reply_markup=after_ai_keyboard(show_duty=not is_work_time()),
+        reply_markup=after_ai_keyboard(
+            show_duty=not is_work_time(),
+            show_operator=question_count >= 3,
+        ),
     )
 
 
@@ -180,4 +182,37 @@ def ai_unavailable_text(language: str) -> str:
         language,
         "Извините, сервис временно недоступен. Попробуйте чуть позже.",
         "Кешіріңіз, сервис уақытша қолжетімсіз. Кейінірек қайталап көріңіз.",
+    )
+
+
+def build_ai_followup_text(question_count: int) -> str:
+    if question_count < 3:
+        left = 3 - question_count
+        operator_hint = (
+            "после 2 следующих запросов"
+            if left == 2
+            else "после следующего запроса"
+        )
+        return (
+            "Я готов продолжить и помочь не хуже живой линии поддержки: напишите "
+            "следующий вопрос или результат проверки. Если за несколько шагов не "
+            f"разберемся, {operator_hint} подскажу вариант с оператором."
+        )
+    return (
+        "Я все еще готов помочь здесь, но если после этих шагов вопрос не решился, "
+        "можно создать обращение оператору или вернуться в меню."
+    )
+
+
+def build_ai_followup_text_kz(question_count: int) -> str:
+    if question_count < 3:
+        left = 3 - question_count
+        return (
+            "Мен әрі қарай көмектесуге дайынмын: келесі сұрақты немесе тексеру "
+            "нәтижесін жазыңыз. Бірнеше қадамнан кейін шешілмесе, "
+            f"{left} келесі сұраудан соң операторға жүгіну нұсқасын ұсынамын."
+        )
+    return (
+        "Мен әлі де осы жерде көмектесуге дайынмын, бірақ мәселе шешілмесе, "
+        "операторға өтініш ашуға немесе мәзірге оралуға болады."
     )

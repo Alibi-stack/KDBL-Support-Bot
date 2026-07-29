@@ -1,10 +1,13 @@
 from functools import lru_cache
 
-from pydantic import Field, field_validator
+from pydantic import Field, ValidationInfo, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from services.env_crypto import decrypt_env_value
 
 
 class Settings(BaseSettings):
+    env_secret_key: str | None = Field(default=None, alias="ENV_SECRET_KEY")
     bot_token: str = Field(alias="BOT_TOKEN")
     admin_chat_id: int | None = Field(default=None, alias="ADMIN_CHAT_ID")
     ai_request_timeout: int = Field(default=60, alias="AI_REQUEST_TIMEOUT")
@@ -22,6 +25,12 @@ class Settings(BaseSettings):
     workday_end_hour: int = Field(default=18, alias="WORKDAY_END_HOUR")
     report_hour: int = Field(default=18, alias="REPORT_HOUR")
     duty_contact: str | None = Field(default=None, alias="DUTY_CONTACT")
+
+    @field_validator("bot_token", "groq_api_key", mode="before")
+    @classmethod
+    def decrypt_secret_values(cls, value: object, info: ValidationInfo) -> object:
+        secret_key = info.data.get("env_secret_key") if info.data else None
+        return decrypt_env_value(value, secret_key)
 
     @field_validator("admin_chat_id", mode="before")
     @classmethod

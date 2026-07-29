@@ -64,6 +64,28 @@ Groq подключен через официальный пакет `groq`.
 Векторный RAG через HuggingFace можно включить позже через `USE_VECTOR_RAG=true`,
 но первый запуск будет заметно дольше.
 
+### Шифрование секретов в `.env`
+
+`BOT_TOKEN` и `GROQ_API_KEY` можно хранить в зашифрованном виде `ENC[...]`.
+
+```powershell
+.\venv\Scripts\python.exe .\tools\encrypt_env_value.py --generate-key
+```
+
+Сохраните результат в `.env` как `ENV_SECRET_KEY=...`, затем зашифруйте нужное
+значение:
+
+```powershell
+.\venv\Scripts\python.exe .\tools\encrypt_env_value.py "ваш_секрет" --key "ENV_SECRET_KEY_из_env"
+```
+
+После этого в `.env` можно заменить обычное значение:
+
+```env
+BOT_TOKEN=ENC[...]
+GROQ_API_KEY=ENC[...]
+```
+
 ## Новые функции
 
 - При первом `/start` бот предлагает выбрать язык: русский или казахский.

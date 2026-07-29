@@ -32,7 +32,10 @@ def main_menu_keyboard() -> InlineKeyboardMarkup:
     )
 
 
-def after_ai_keyboard(show_duty: bool = False) -> InlineKeyboardMarkup:
+def after_ai_keyboard(
+    show_duty: bool = False,
+    show_operator: bool = True,
+) -> InlineKeyboardMarkup:
     if show_duty:
         keyboard = [
             [
@@ -42,7 +45,7 @@ def after_ai_keyboard(show_duty: bool = False) -> InlineKeyboardMarkup:
                 )
             ],
         ]
-    else:
+    elif show_operator:
         keyboard = [
             [
                 InlineKeyboardButton(
@@ -51,6 +54,8 @@ def after_ai_keyboard(show_duty: bool = False) -> InlineKeyboardMarkup:
                 )
             ],
         ]
+    else:
+        keyboard = []
     keyboard.append([InlineKeyboardButton(text="Главное меню", callback_data="main_menu")])
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
@@ -129,8 +134,18 @@ def ticket_phonebook_keyboard(ticket_id: int) -> InlineKeyboardMarkup:
                     callback_data=f"ticket_phonebook:{ticket_id}:simbase",
                 ),
                 InlineKeyboardButton(
+                    text="1С",
+                    callback_data=f"ticket_phonebook:{ticket_id}:onec",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
                     text="Metadoc",
                     callback_data=f"ticket_phonebook:{ticket_id}:metadoc",
+                ),
+                InlineKeyboardButton(
+                    text="Личный кабинет",
+                    callback_data=f"ticket_phonebook:{ticket_id}:personal_account",
                 ),
             ],
             [

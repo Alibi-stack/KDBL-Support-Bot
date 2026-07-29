@@ -16,6 +16,8 @@ from handlers.start import (
 )
 from handlers.user_dialog import (
     AI_UNAVAILABLE_TEXT,
+    build_ai_followup_text,
+    build_ai_followup_text_kz,
     clean_ai_answer,
     safe_edit_or_answer,
     save_ai_history,
@@ -81,8 +83,10 @@ CANNED_RESPONSES = {
 
 PHONEBOOK_RESPONSES = {
     "simbase": "Номера сотрудников по Simbase:\n\n535 - Асхат\n534 - Абдулла\n474 - Олжас",
-    "metadoc": "Номера сотрудников по Metadoc:\n\n700 - Дархан\n477 - Абылайхан",
-    "lotus_tech": "Номера сотрудников по Lotus и техническим вопросам:\n\n700 - Дархан",
+    "onec": "Номера сотрудников по 1С:\n\n362 - Айгуль",
+    "metadoc": "Номера сотрудников по Metadoc:\n\n700 - диспетчер\n687 - Артур\n477 - Абылайхан",
+    "lotus_tech": "Номера сотрудников по Lotus и техническим вопросам:\n\n700 - диспетчер\n687 - Артур",
+    "personal_account": "Номера сотрудников по Личному кабинету:\n\n687 - Артур",
     "all": build_phonebook_text("ru"),
 }
 
@@ -558,15 +562,17 @@ async def answer_with_rag(message: Message, state: FSMContext) -> None:
         await message.answer(chunk)
 
     await save_ai_history(state, history, message.text, answer)
+    question_count = len(history) // 2 + 1
     await message.answer(
         pick(
             language,
-            "Если ответ не помог, можно создать обращение оператору или вернуться в "
-            "меню.",
-            "Жауап көмектеспесе, операторға өтініш ашуға немесе мәзірге оралуға "
-            "болады.",
+            build_ai_followup_text(question_count),
+            build_ai_followup_text_kz(question_count),
         ),
-        reply_markup=after_ai_keyboard(show_duty=not is_work_time()),
+        reply_markup=after_ai_keyboard(
+            show_duty=not is_work_time(),
+            show_operator=question_count >= 3,
+        ),
     )
 
 
