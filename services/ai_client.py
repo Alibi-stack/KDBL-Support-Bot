@@ -42,6 +42,7 @@ SYSTEM_PROMPT = """
 async def get_ai_response(
     user_text: str,
     history: list[dict[str, str]] | None = None,
+    language: str = "ru",
 ) -> str:
     if not user_text.strip():
         raise AIServiceError("Empty user request")
@@ -52,26 +53,33 @@ async def get_ai_response(
     if provider == "groq" and settings.groq_api_key:
         try:
             return await asyncio.wait_for(
-                _get_groq_response(user_text, history or []),
+                _get_groq_response(user_text, history or [], language),
                 timeout=settings.ai_request_timeout,
             )
         except (AIServiceError, TimeoutError, asyncio.TimeoutError):
             logger.exception("Groq unavailable, using local fallback")
-            return await _get_local_it_fallback(user_text, history or [])
+            return await _get_local_it_fallback(user_text, history or [], language)
 
-    return await _get_stub_response(user_text)
+    return await _get_stub_response(user_text, language)
 
 
-async def _get_stub_response(user_text: str) -> str:
+async def _get_stub_response(user_text: str, language: str = "ru") -> str:
     await asyncio.sleep(0.5)
 
     lowered = user_text.lower()
     if "оператор" in lowered or "человек" in lowered:
+        if language == "kz":
+            return "Дәл жауап үшін операторды қосқан дұрыс."
         return (
-            "Лучше подключить оператора для точного ответа.\n"
-            "Дәл жауап үшін операторды қосқан дұрыс."
+            "Лучше подключить оператора для точного ответа."
         )
 
+    if language == "kz":
+        return (
+            "AI-модулінің тест жауабы. Қазір Groq-ты .env ішіндегі "
+            "GROQ_API_KEY арқылы қосуға болады.\n\n"
+            f"Сіздің сұрағыңыз: {user_text}"
+        )
     return (
         "Тестовый ответ AI-модуля. Сейчас можно подключить Groq через "
         "GROQ_API_KEY в .env.\n\n"
@@ -82,7 +90,11 @@ async def _get_stub_response(user_text: str) -> str:
 async def _get_local_it_fallback(
     user_text: str,
     history: list[dict[str, str]] | None = None,
+    language: str = "ru",
 ) -> str:
+    if language == "kz":
+        return _get_local_it_fallback_kz(user_text, history)
+
     lowered = user_text.lower()
     history_text = " ".join(
         item.get("content", "") for item in (history or [])[-6:]
@@ -227,12 +239,59 @@ async def _get_local_it_fallback(
     )
 
 
+def _get_local_it_fallback_kz(
+    user_text: str,
+    history: list[dict[str, str]] | None = None,
+) -> str:
+    lowered = user_text.lower()
+    history_text = " ".join(
+        item.get("content", "") for item in (history or [])[-6:]
+    ).lower()
+    combined = f"{history_text} {lowered}"
+
+    if any(word in combined for word in ("комп", "компьютер", "ноут", "завис")):
+        return (
+            "Компьютер бойынша алдымен қуат кабелін және желіге қосылуын тексеріңіз. "
+            "Егер қатып қалса, 1-2 минут күтіп, Ctrl + Alt + Delete басып көріңіз. "
+            "Көмектеспесе, қуат батырмасын 5-10 секунд басып тұрып қайта қосыңыз. "
+            "Мәселе қайталанса, операторға өтініш ашуға болады."
+        )
+
+    if any(word in combined for word in ("принтер", "печать", "сканер", "printer")):
+        return (
+            "Принтер/сканер бойынша құрылғының қосулы екенін, қағазды, кабель/Wi-Fi "
+            "байланысын және басып шығару кезегін тексеріңіз. Принтерді қайта іске "
+            "қосып көріңіз. Қате коды немесе скриншот болса, операторға жіберіңіз."
+        )
+
+    if any(word in combined for word in ("lotus", "лотус")):
+        return (
+            "Lotus бойынша қолданбаны қайта іске қосып, сервермен байланыс барын "
+            "тексеріңіз. Қай жерде мәселе екенін нақтылаңыз: кіру, қолжетімділік, "
+            "құжат іздеу, тіркеу, қол қою немесе жіберу."
+        )
+
+    if any(word in combined for word in ("метадок", "metadoc")):
+        return (
+            "Metadoc бойынша бетті жаңартып, браузерді немесе қолданбаны қайта "
+            "іске қосып көріңіз. Желі байланысын тексеріңіз. Қате мәтіні болса, "
+            "оны жазыңыз немесе скриншот жіберіңіз."
+        )
+
+    return (
+        "Мен көмектесуге дайынмын. Қай жұмыс жүйесімен немесе құрылғымен мәселе "
+        "екенін нақтылап жазыңыз: Lotus, 1С, пошта, қолжетімділік, Word/PDF "
+        "құжат, принтер, интернет немесе компьютер."
+    )
+
+
 async def _get_groq_response(
     user_text: str,
     history: list[dict[str, str]],
+    language: str,
 ) -> str:
     try:
-        return await asyncio.to_thread(_generate_groq_text, user_text, history)
+        return await asyncio.to_thread(_generate_groq_text, user_text, history, language)
     except Exception as error:
         logger.exception("Groq API request failed")
         raise AIServiceError("Groq API request failed") from error
@@ -241,6 +300,7 @@ async def _get_groq_response(
 def _generate_groq_text(
     user_text: str,
     history: list[dict[str, str]],
+    language: str,
 ) -> str:
     from groq import Groq
 
@@ -259,6 +319,17 @@ def _generate_groq_text(
         .replace("{{CHAT_HISTORY}}", format_history(history))
         .replace("{{USER_QUERY}}", user_text)
     )
+    if language == "kz":
+        system_prompt += (
+            "\n\nМІНДЕТТІ ТАЛАП: пайдаланушы қазақ тілін таңдаған. "
+            "Пайдаланушы орысша жазса да, answer мәнін тек қазақ тілінде жаз. "
+            "Орысша сөйлем қоспа."
+        )
+    else:
+        system_prompt += (
+            "\n\nОБЯЗАТЕЛЬНОЕ ТРЕБОВАНИЕ: пользователь выбрал русский язык. "
+            "Поле answer пиши на русском языке."
+        )
 
     response = client.chat.completions.create(
         model=settings.groq_model,

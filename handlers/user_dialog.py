@@ -71,7 +71,7 @@ async def handle_ai_question(message: Message, state: FSMContext) -> None:
     )
 
     try:
-        answer = await get_ai_response(message.text, history=history)
+        answer = await get_ai_response(message.text, history=history, language=language)
     except (AIServiceError, TimeoutError, asyncio.TimeoutError):
         logger.exception("AI service failed")
         await safe_edit_or_answer(

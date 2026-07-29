@@ -542,7 +542,7 @@ async def answer_with_rag(message: Message, state: FSMContext) -> None:
     )
 
     try:
-        answer = await get_ai_response(message.text, history=history)
+        answer = await get_ai_response(message.text, history=history, language=language)
     except (AIServiceError, TimeoutError, asyncio.TimeoutError):
         logger.exception("AI service failed in support fallback flow")
         answer = AI_UNAVAILABLE_TEXT
