@@ -85,10 +85,13 @@ services:
       - kdbl-network
 
   alertmanager-init:
-    image: python:3.13-slim
+    build: .
+    image: my_ai_bot-bot
     container_name: kdbl-alertmanager-init
     env_file:
       - .env
+    environment:
+      PYTHONPATH: /app
     volumes:
       - ./monitoring/alertmanager/render_config.py:/render_config.py:ro
       - alertmanager_config:/etc/alertmanager
