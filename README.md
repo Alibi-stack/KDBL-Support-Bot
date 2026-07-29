@@ -166,6 +166,7 @@ GROQ_API_KEY=ENC[...]
   `ADMIN_CHAT_ID`. Для ручной проверки в админ-группе есть команда
   `/daily_report`.
 - Мат-фильтр: 2 предупреждения, затем мут на 30 минут.
+- Антиспам: по умолчанию 3 сообщения за 10 секунд, затем пауза на 30 секунд.
 
 Настройки:
 
@@ -176,6 +177,9 @@ WORKDAY_START_MINUTE=30
 WORKDAY_END_HOUR=18
 REPORT_HOUR=18
 DUTY_CONTACT=
+RATE_LIMIT_MESSAGES=3
+RATE_LIMIT_WINDOW=10
+RATE_LIMIT_COOLDOWN=30
 ```
 
 ## Операторская группа
