@@ -1,0 +1,86 @@
+{
+  "id": null,
+  "uid": "kdbl-support-bot",
+  "title": "KDBL Support Bot",
+  "tags": ["kdbl", "support-bot"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Сообщения в минуту",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus-kdbl" },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-kdbl" },
+          "expr": "sum by (type) (rate(kdbl_messages_total[1m]) * 60)",
+          "legendFormat": "{{type}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] }
+    },
+    {
+      "id": 2,
+      "title": "Время ответа AI (p50 / p95)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus-kdbl" },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-kdbl" },
+          "expr": "histogram_quantile(0.50, sum(rate(kdbl_ai_response_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p50"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-kdbl" },
+          "expr": "histogram_quantile(0.95, sum(rate(kdbl_ai_response_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p95"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] }
+    },
+    {
+      "id": 3,
+      "title": "Ошибки AI/RAG в минуту",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus-kdbl" },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-kdbl" },
+          "expr": "rate(kdbl_ai_errors_total[1m]) * 60",
+          "legendFormat": "ошибки/мин"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] }
+    },
+    {
+      "id": 4,
+      "title": "Обращения по статусам",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus-kdbl" },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-kdbl" },
+          "expr": "kdbl_active_tickets",
+          "legendFormat": "открытые сейчас (open + in_progress)"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-kdbl" },
+          "expr": "sum by (status) (increase(kdbl_tickets_total[1h]))",
+          "legendFormat": "{{status}} (за час)"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] }
+    }
+  ]
+}

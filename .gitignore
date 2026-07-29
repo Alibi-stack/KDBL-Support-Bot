@@ -1,7 +1,18 @@
 .env
+.env.local
 support.db
 venv/
+.venv/
 __pycache__/
 *.pyc
 *.log
 chroma_store/
+
+# Docker/Compose-локальные данные (сами данные живут в named volumes
+# Docker, а не в репозитории; сюда попадёт только если кто-то по ошибке
+# сделает bind-mount вместо named volume).
+pg_data/
+chroma_data/
+prometheus_data/
+grafana_data/
+superset_home/

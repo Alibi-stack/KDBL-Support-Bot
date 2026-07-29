@@ -5,22 +5,44 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.exceptions import TelegramNetworkError
 from aiogram.fsm.storage.memory import MemoryStorage
+from pythonjsonlogger.json import JsonFormatter
 
 from config import get_settings
 from handlers import setup_routers
 from middlewares.moderation import ModerationMiddleware
 from middlewares.rate_limit import RateLimitMiddleware
+from services.metrics import start_metrics_server
 from services.reports import daily_report_loop
 from services.ticket_storage import init_db
 
 
-async def main() -> None:
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+def configure_logging() -> None:
+    """Структурное (JSON) логирование в stdout для docker logs / агрегаторов.
+
+    Поля timestamp/level/logger/message есть всегда; user_id/ticket_id и
+    другие произвольные поля попадают в JSON автоматически, если их
+    передать через logger.info(..., extra={"user_id": ...})."""
+    handler = logging.StreamHandler()
+    handler.setFormatter(
+        JsonFormatter(
+            "%(asctime)s %(levelname)s %(name)s %(message)s",
+            rename_fields={
+                "asctime": "timestamp",
+                "levelname": "level",
+                "name": "logger",
+            },
+        )
     )
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO)
+    root_logger.addHandler(handler)
+
+
+async def main() -> None:
+    configure_logging()
 
     settings = get_settings()
+    start_metrics_server(8080)
     await init_db()
     asyncio.create_task(warmup_rag())
 

@@ -1,0 +1,29 @@
+groups:
+  - name: kdbl-bot-alerts
+    rules:
+      - alert: BotDown
+        expr: up{job="kdbl-bot"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "KDBL Support Bot не отвечает"
+          description: "Prometheus не может собрать метрики с бота (bot:8080) дольше 2 минут."
+
+      - alert: HighAiErrorRate
+        expr: rate(kdbl_ai_errors_total[5m]) / clamp_min(rate(kdbl_messages_total[5m]), 1) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Высокий процент ошибок AI/RAG"
+          description: "Более 10% запросов к AI завершаются ошибкой за последние 5 минут."
+
+      - alert: TooManyOpenTickets
+        expr: kdbl_active_tickets > 20
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Слишком много открытых обращений"
+          description: "Больше 20 обращений одновременно открыты дольше 10 минут -- операторам может нужна помощь."

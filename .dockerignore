@@ -1,0 +1,9 @@
+.git
+.env
+.env.example
+support.db
+chroma_store/
+venv/
+__pycache__/
+*.pyc
+*.log

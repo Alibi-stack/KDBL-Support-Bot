@@ -1,0 +1,179 @@
+networks:
+  kdbl-network:
+    driver: bridge
+
+volumes:
+  pg_data:
+  chroma_data:
+  prometheus_data:
+  grafana_data:
+  alertmanager_config:
+  superset_home:
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: kdbl-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: support
+      POSTGRES_USER: kdbl
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-kdbl}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kdbl -d support"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - kdbl-network
+
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: kdbl-chromadb
+    restart: unless-stopped
+    volumes:
+      - chroma_data:/chroma/chroma
+    ports:
+      - "8000:8000"
+    networks:
+      - kdbl-network
+
+  bot:
+    build: .
+    container_name: kdbl-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://kdbl:${POSTGRES_PASSWORD:-kdbl}@postgres:5432/support}
+      CHROMA_HOST: chromadb
+      CHROMA_PORT: 8000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      chromadb:
+        condition: service_started
+    ports:
+      - "8080:8080"
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+    networks:
+      - kdbl-network
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: kdbl-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    depends_on:
+      - alertmanager
+      - bot
+    networks:
+      - kdbl-network
+
+  alertmanager-init:
+    image: python:3.13-slim
+    container_name: kdbl-alertmanager-init
+    env_file:
+      - .env
+    volumes:
+      - ./monitoring/alertmanager/render_config.py:/render_config.py:ro
+      - alertmanager_config:/etc/alertmanager
+    command: ["python", "/render_config.py"]
+    restart: "no"
+    networks:
+      - kdbl-network
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: kdbl-alertmanager
+    restart: unless-stopped
+    depends_on:
+      alertmanager-init:
+        condition: service_completed_successfully
+    volumes:
+      - alertmanager_config:/etc/alertmanager
+    ports:
+      - "9093:9093"
+    networks:
+      - kdbl-network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: kdbl-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GF_SECURITY_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-kdbl}
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+      - postgres
+    networks:
+      - kdbl-network
+
+  superset-init:
+    image: apache/superset:latest
+    container_name: kdbl-superset-init
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY:-change_me_to_a_long_random_string_please}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://kdbl:${POSTGRES_PASSWORD:-kdbl}@postgres:5432/support}
+      SUPERSET_CONFIG_PATH: /app/pythonpath/superset_config.py
+      SUPERSET_ADMIN_PASSWORD: ${SUPERSET_ADMIN_PASSWORD:-admin}
+    volumes:
+      - ./superset/superset_config.py:/app/pythonpath/superset_config.py:ro
+      - superset_home:/app/superset_home
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        superset db upgrade &&
+        superset fab create-admin --username admin --firstname Admin --lastname Admin --email admin@kdbl.local --password "$$SUPERSET_ADMIN_PASSWORD"
+        superset init
+    restart: "no"
+    networks:
+      - kdbl-network
+
+  superset:
+    image: apache/superset:latest
+    container_name: kdbl-superset
+    restart: unless-stopped
+    depends_on:
+      superset-init:
+        condition: service_completed_successfully
+    environment:
+      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY:-change_me_to_a_long_random_string_please}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://kdbl:${POSTGRES_PASSWORD:-kdbl}@postgres:5432/support}
+      SUPERSET_CONFIG_PATH: /app/pythonpath/superset_config.py
+    volumes:
+      - ./superset/superset_config.py:/app/pythonpath/superset_config.py:ro
+      - superset_home:/app/superset_home
+    ports:
+      - "8088:8088"
+    command: >
+      gunicorn --bind 0.0.0.0:8088 --workers 2 --worker-class gthread
+      --threads 20 --timeout 120 "superset.app:create_app()"
+    networks:
+      - kdbl-network

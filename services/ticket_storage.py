@@ -1,13 +1,15 @@
 from __future__ import annotations
 
-import asyncio
-import sqlite3
+import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import Any
 
+import asyncpg
+
 from config import get_settings
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -39,18 +41,77 @@ class TicketReportRow:
     closed_at: str | None
 
 
+SCHEMA_SQL = """
+CREATE TABLE IF NOT EXISTS tickets (
+    id SERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    user_name TEXT NOT NULL,
+    username TEXT,
+    question TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'open',
+    operator_id BIGINT,
+    operator_name TEXT,
+    admin_chat_id BIGINT,
+    admin_message_id BIGINT,
+    admin_thread_id BIGINT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    closed_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_tickets_user_status
+    ON tickets(user_id, status);
+
+CREATE TABLE IF NOT EXISTS ticket_messages (
+    id SERIAL PRIMARY KEY,
+    ticket_id INTEGER NOT NULL REFERENCES tickets(id),
+    sender_role TEXT NOT NULL,
+    sender_id BIGINT NOT NULL,
+    sender_name TEXT NOT NULL,
+    text TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS user_settings (
+    user_id BIGINT PRIMARY KEY,
+    language TEXT NOT NULL DEFAULT 'ru',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS moderation_state (
+    user_id BIGINT PRIMARY KEY,
+    warnings INTEGER NOT NULL DEFAULT 0,
+    muted_until TEXT,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS app_state (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+"""
+
+_pool: asyncpg.Pool | None = None
+
+
 def _now() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds")
 
 
-def _connect() -> sqlite3.Connection:
-    db_path = Path(get_settings().database_path)
-    connection = sqlite3.connect(db_path)
-    connection.row_factory = sqlite3.Row
-    return connection
+async def _get_pool() -> asyncpg.Pool:
+    global _pool
+    if _pool is None:
+        _pool = await asyncpg.create_pool(
+            dsn=get_settings().database_url,
+            min_size=1,
+            max_size=10,
+        )
+    return _pool
 
 
-def _row_to_ticket(row: sqlite3.Row | None) -> Ticket | None:
+def _row_to_ticket(row: asyncpg.Record | None) -> Ticket | None:
     if row is None:
         return None
     return Ticket(
@@ -68,110 +129,10 @@ def _row_to_ticket(row: sqlite3.Row | None) -> Ticket | None:
     )
 
 
-def _init_db_sync() -> None:
-    with _connect() as connection:
-        connection.executescript(
-            """
-            CREATE TABLE IF NOT EXISTS tickets (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                user_name TEXT NOT NULL,
-                username TEXT,
-                question TEXT NOT NULL,
-                status TEXT NOT NULL DEFAULT 'open',
-                operator_id INTEGER,
-                operator_name TEXT,
-                admin_chat_id INTEGER,
-                admin_message_id INTEGER,
-                admin_thread_id INTEGER,
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL,
-                closed_at TEXT
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_tickets_user_status
-                ON tickets(user_id, status);
-
-            CREATE TABLE IF NOT EXISTS ticket_messages (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                ticket_id INTEGER NOT NULL,
-                sender_role TEXT NOT NULL,
-                sender_id INTEGER NOT NULL,
-                sender_name TEXT NOT NULL,
-                text TEXT NOT NULL,
-                created_at TEXT NOT NULL,
-                FOREIGN KEY(ticket_id) REFERENCES tickets(id)
-            );
-
-            CREATE TABLE IF NOT EXISTS user_settings (
-                user_id INTEGER PRIMARY KEY,
-                language TEXT NOT NULL DEFAULT 'ru',
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS moderation_state (
-                user_id INTEGER PRIMARY KEY,
-                warnings INTEGER NOT NULL DEFAULT 0,
-                muted_until TEXT,
-                updated_at TEXT NOT NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS app_state (
-                key TEXT PRIMARY KEY,
-                value TEXT NOT NULL,
-                updated_at TEXT NOT NULL
-            );
-            """
-        )
-        columns = {
-            row["name"]
-            for row in connection.execute("PRAGMA table_info(tickets)").fetchall()
-        }
-        if "admin_thread_id" not in columns:
-            connection.execute("ALTER TABLE tickets ADD COLUMN admin_thread_id INTEGER")
-
-
 async def init_db() -> None:
-    await asyncio.to_thread(_init_db_sync)
-
-
-def _create_ticket_sync(
-    user_id: int,
-    user_name: str,
-    username: str | None,
-    question: str,
-    admin_chat_id: int,
-) -> Ticket:
-    now = _now()
-    with _connect() as connection:
-        cursor = connection.execute(
-            """
-            INSERT INTO tickets (
-                user_id, user_name, username, question, status,
-                admin_chat_id, created_at, updated_at
-            )
-            VALUES (?, ?, ?, ?, 'open', ?, ?, ?)
-            """,
-            (user_id, user_name, username, question, admin_chat_id, now, now),
-        )
-        ticket_id = cursor.lastrowid
-        connection.execute(
-            """
-            INSERT INTO ticket_messages (
-                ticket_id, sender_role, sender_id, sender_name, text, created_at
-            )
-            VALUES (?, 'user', ?, ?, ?, ?)
-            """,
-            (ticket_id, user_id, user_name, question, now),
-        )
-        row = connection.execute(
-            "SELECT * FROM tickets WHERE id = ?",
-            (ticket_id,),
-        ).fetchone()
-    ticket = _row_to_ticket(row)
-    assert ticket is not None
-    return ticket
+    pool = await _get_pool()
+    async with pool.acquire() as connection:
+        await connection.execute(SCHEMA_SQL)
 
 
 async def create_ticket(
@@ -181,79 +142,90 @@ async def create_ticket(
     question: str,
     admin_chat_id: int,
 ) -> Ticket:
-    return await asyncio.to_thread(
-        _create_ticket_sync,
-        user_id,
-        user_name,
-        username,
-        question,
-        admin_chat_id,
-    )
+    now = _now()
+    pool = await _get_pool()
+    async with pool.acquire() as connection, connection.transaction():
+        ticket_id = await connection.fetchval(
+            """
+            INSERT INTO tickets (
+                user_id, user_name, username, question, status,
+                admin_chat_id, created_at, updated_at
+            )
+            VALUES ($1, $2, $3, $4, 'open', $5, $6, $6)
+            RETURNING id
+            """,
+            user_id,
+            user_name,
+            username,
+            question,
+            admin_chat_id,
+            now,
+        )
+        await connection.execute(
+            """
+            INSERT INTO ticket_messages (
+                ticket_id, sender_role, sender_id, sender_name, text, created_at
+            )
+            VALUES ($1, 'user', $2, $3, $4, $5)
+            """,
+            ticket_id,
+            user_id,
+            user_name,
+            question,
+            now,
+        )
+        row = await connection.fetchrow(
+            "SELECT * FROM tickets WHERE id = $1",
+            ticket_id,
+        )
+    ticket = _row_to_ticket(row)
+    assert ticket is not None
 
+    from services import metrics
 
-def _get_ticket_sync(ticket_id: int) -> Ticket | None:
-    with _connect() as connection:
-        row = connection.execute(
-            "SELECT * FROM tickets WHERE id = ?",
-            (ticket_id,),
-        ).fetchone()
-    return _row_to_ticket(row)
+    metrics.tickets_total.labels(status="open").inc()
+    metrics.active_tickets.inc()
+
+    return ticket
 
 
 async def get_ticket(ticket_id: int) -> Ticket | None:
-    return await asyncio.to_thread(_get_ticket_sync, ticket_id)
-
-
-def _get_active_ticket_by_user_sync(user_id: int) -> Ticket | None:
-    with _connect() as connection:
-        row = connection.execute(
-            """
-            SELECT * FROM tickets
-            WHERE user_id = ? AND status IN ('open', 'in_progress')
-            ORDER BY id DESC
-            LIMIT 1
-            """,
-            (user_id,),
-        ).fetchone()
+    pool = await _get_pool()
+    async with pool.acquire() as connection:
+        row = await connection.fetchrow(
+            "SELECT * FROM tickets WHERE id = $1",
+            ticket_id,
+        )
     return _row_to_ticket(row)
 
 
 async def get_active_ticket_by_user(user_id: int) -> Ticket | None:
-    return await asyncio.to_thread(_get_active_ticket_by_user_sync, user_id)
-
-
-def _get_active_ticket_by_operator_sync(operator_id: int) -> Ticket | None:
-    with _connect() as connection:
-        row = connection.execute(
+    pool = await _get_pool()
+    async with pool.acquire() as connection:
+        row = await connection.fetchrow(
             """
             SELECT * FROM tickets
-            WHERE operator_id = ? AND status = 'in_progress'
+            WHERE user_id = $1 AND status IN ('open', 'in_progress')
             ORDER BY id DESC
             LIMIT 1
             """,
-            (operator_id,),
-        ).fetchone()
+            user_id,
+        )
     return _row_to_ticket(row)
 
 
 async def get_active_ticket_by_operator(operator_id: int) -> Ticket | None:
-    return await asyncio.to_thread(_get_active_ticket_by_operator_sync, operator_id)
-
-
-def _get_ticket_by_thread_sync(
-    admin_chat_id: int,
-    admin_thread_id: int,
-) -> Ticket | None:
-    with _connect() as connection:
-        row = connection.execute(
+    pool = await _get_pool()
+    async with pool.acquire() as connection:
+        row = await connection.fetchrow(
             """
             SELECT * FROM tickets
-            WHERE admin_chat_id = ? AND admin_thread_id = ?
+            WHERE operator_id = $1 AND status = 'in_progress'
             ORDER BY id DESC
             LIMIT 1
             """,
-            (admin_chat_id, admin_thread_id),
-        ).fetchone()
+            operator_id,
+        )
     return _row_to_ticket(row)
 
 
@@ -261,48 +233,50 @@ async def get_ticket_by_thread(
     admin_chat_id: int,
     admin_thread_id: int,
 ) -> Ticket | None:
-    return await asyncio.to_thread(
-        _get_ticket_by_thread_sync,
-        admin_chat_id,
-        admin_thread_id,
-    )
+    pool = await _get_pool()
+    async with pool.acquire() as connection:
+        row = await connection.fetchrow(
+            """
+            SELECT * FROM tickets
+            WHERE admin_chat_id = $1 AND admin_thread_id = $2
+            ORDER BY id DESC
+            LIMIT 1
+            """,
+            admin_chat_id,
+            admin_thread_id,
+        )
+    return _row_to_ticket(row)
 
 
-def _update_ticket_sync(ticket_id: int, **fields: Any) -> Ticket | None:
+async def _update_ticket(ticket_id: int, **fields: Any) -> Ticket | None:
     if not fields:
-        return _get_ticket_sync(ticket_id)
+        return await get_ticket(ticket_id)
 
     fields["updated_at"] = _now()
-    assignments = ", ".join(f"{name} = ?" for name in fields)
+    names = list(fields.keys())
     values = list(fields.values())
-    values.append(ticket_id)
+    assignments = ", ".join(f"{name} = ${i + 1}" for i, name in enumerate(names))
 
-    with _connect() as connection:
-        connection.execute(
-            f"UPDATE tickets SET {assignments} WHERE id = ?",
-            values,
+    pool = await _get_pool()
+    async with pool.acquire() as connection:
+        await connection.execute(
+            f"UPDATE tickets SET {assignments} WHERE id = ${len(values) + 1}",
+            *values,
+            ticket_id,
         )
-        row = connection.execute(
-            "SELECT * FROM tickets WHERE id = ?",
-            (ticket_id,),
-        ).fetchone()
+        row = await connection.fetchrow(
+            "SELECT * FROM tickets WHERE id = $1",
+            ticket_id,
+        )
     return _row_to_ticket(row)
 
 
 async def set_ticket_admin_message(ticket_id: int, message_id: int) -> Ticket | None:
-    return await asyncio.to_thread(
-        _update_ticket_sync,
-        ticket_id,
-        admin_message_id=message_id,
-    )
+    return await _update_ticket(ticket_id, admin_message_id=message_id)
 
 
 async def set_ticket_admin_thread(ticket_id: int, thread_id: int) -> Ticket | None:
-    return await asyncio.to_thread(
-        _update_ticket_sync,
-        ticket_id,
-        admin_thread_id=thread_id,
-    )
+    return await _update_ticket(ticket_id, admin_thread_id=thread_id)
 
 
 async def assign_ticket(
@@ -310,8 +284,7 @@ async def assign_ticket(
     operator_id: int,
     operator_name: str,
 ) -> Ticket | None:
-    return await asyncio.to_thread(
-        _update_ticket_sync,
+    return await _update_ticket(
         ticket_id,
         status="in_progress",
         operator_id=operator_id,
@@ -320,8 +293,7 @@ async def assign_ticket(
 
 
 async def release_ticket(ticket_id: int) -> Ticket | None:
-    return await asyncio.to_thread(
-        _update_ticket_sync,
+    return await _update_ticket(
         ticket_id,
         status="open",
         operator_id=None,
@@ -330,35 +302,19 @@ async def release_ticket(ticket_id: int) -> Ticket | None:
 
 
 async def close_ticket(ticket_id: int) -> Ticket | None:
-    return await asyncio.to_thread(
-        _update_ticket_sync,
+    ticket = await _update_ticket(
         ticket_id,
         status="closed",
         closed_at=_now(),
     )
 
+    if ticket is not None:
+        from services import metrics
 
-def _add_message_sync(
-    ticket_id: int,
-    sender_role: str,
-    sender_id: int,
-    sender_name: str,
-    text: str,
-) -> None:
-    with _connect() as connection:
-        connection.execute(
-            """
-            INSERT INTO ticket_messages (
-                ticket_id, sender_role, sender_id, sender_name, text, created_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?)
-            """,
-            (ticket_id, sender_role, sender_id, sender_name, text, _now()),
-        )
-        connection.execute(
-            "UPDATE tickets SET updated_at = ? WHERE id = ?",
-            (_now(), ticket_id),
-        )
+        metrics.tickets_total.labels(status="closed").inc()
+        metrics.active_tickets.dec()
+
+    return ticket
 
 
 async def add_message(
@@ -368,81 +324,68 @@ async def add_message(
     sender_name: str,
     text: str,
 ) -> None:
-    await asyncio.to_thread(
-        _add_message_sync,
-        ticket_id,
-        sender_role,
-        sender_id,
-        sender_name,
-        text,
-    )
-
-
-def _get_user_language_sync(user_id: int) -> str | None:
-    with _connect() as connection:
-        row = connection.execute(
-            "SELECT language FROM user_settings WHERE user_id = ?",
-            (user_id,),
-        ).fetchone()
-    return row["language"] if row else None
+    now = _now()
+    pool = await _get_pool()
+    async with pool.acquire() as connection:
+        await connection.execute(
+            """
+            INSERT INTO ticket_messages (
+                ticket_id, sender_role, sender_id, sender_name, text, created_at
+            )
+            VALUES ($1, $2, $3, $4, $5, $6)
+            """,
+            ticket_id,
+            sender_role,
+            sender_id,
+            sender_name,
+            text,
+            now,
+        )
+        await connection.execute(
+            "UPDATE tickets SET updated_at = $1 WHERE id = $2",
+            now,
+            ticket_id,
+        )
 
 
 async def get_user_language(user_id: int) -> str | None:
-    return await asyncio.to_thread(_get_user_language_sync, user_id)
-
-
-def _set_user_language_sync(user_id: int, language: str) -> None:
-    now = _now()
-    with _connect() as connection:
-        connection.execute(
-            """
-            INSERT INTO user_settings (user_id, language, created_at, updated_at)
-            VALUES (?, ?, ?, ?)
-            ON CONFLICT(user_id) DO UPDATE SET
-                language = excluded.language,
-                updated_at = excluded.updated_at
-            """,
-            (user_id, language, now, now),
+    pool = await _get_pool()
+    async with pool.acquire() as connection:
+        row = await connection.fetchrow(
+            "SELECT language FROM user_settings WHERE user_id = $1",
+            user_id,
         )
+    return row["language"] if row else None
 
 
 async def set_user_language(user_id: int, language: str) -> None:
-    await asyncio.to_thread(_set_user_language_sync, user_id, language)
-
-
-def _get_moderation_state_sync(user_id: int) -> tuple[int, str | None]:
-    with _connect() as connection:
-        row = connection.execute(
-            "SELECT warnings, muted_until FROM moderation_state WHERE user_id = ?",
-            (user_id,),
-        ).fetchone()
-    if row is None:
-        return 0, None
-    return row["warnings"], row["muted_until"]
+    now = _now()
+    pool = await _get_pool()
+    async with pool.acquire() as connection:
+        await connection.execute(
+            """
+            INSERT INTO user_settings (user_id, language, created_at, updated_at)
+            VALUES ($1, $2, $3, $3)
+            ON CONFLICT (user_id) DO UPDATE SET
+                language = EXCLUDED.language,
+                updated_at = EXCLUDED.updated_at
+            """,
+            user_id,
+            language,
+            now,
+        )
 
 
 async def get_moderation_state(user_id: int) -> tuple[int, str | None]:
-    return await asyncio.to_thread(_get_moderation_state_sync, user_id)
-
-
-def _set_moderation_state_sync(
-    user_id: int,
-    warnings: int,
-    muted_until: str | None,
-) -> None:
-    now = _now()
-    with _connect() as connection:
-        connection.execute(
-            """
-            INSERT INTO moderation_state (user_id, warnings, muted_until, updated_at)
-            VALUES (?, ?, ?, ?)
-            ON CONFLICT(user_id) DO UPDATE SET
-                warnings = excluded.warnings,
-                muted_until = excluded.muted_until,
-                updated_at = excluded.updated_at
-            """,
-            (user_id, warnings, muted_until, now),
+    pool = await _get_pool()
+    async with pool.acquire() as connection:
+        row = await connection.fetchrow(
+            "SELECT warnings, muted_until FROM moderation_state WHERE user_id = $1",
+            user_id,
         )
+    if row is None:
+        return 0, None
+    return row["warnings"], row["muted_until"]
 
 
 async def set_moderation_state(
@@ -450,56 +393,70 @@ async def set_moderation_state(
     warnings: int,
     muted_until: str | None,
 ) -> None:
-    await asyncio.to_thread(_set_moderation_state_sync, user_id, warnings, muted_until)
-
-
-def _get_app_state_sync(key: str) -> str | None:
-    with _connect() as connection:
-        row = connection.execute(
-            "SELECT value FROM app_state WHERE key = ?",
-            (key,),
-        ).fetchone()
-    return row["value"] if row else None
-
-
-async def get_app_state(key: str) -> str | None:
-    return await asyncio.to_thread(_get_app_state_sync, key)
-
-
-def _set_app_state_sync(key: str, value: str) -> None:
-    with _connect() as connection:
-        connection.execute(
+    now = _now()
+    pool = await _get_pool()
+    async with pool.acquire() as connection:
+        await connection.execute(
             """
-            INSERT INTO app_state (key, value, updated_at)
-            VALUES (?, ?, ?)
-            ON CONFLICT(key) DO UPDATE SET
-                value = excluded.value,
-                updated_at = excluded.updated_at
+            INSERT INTO moderation_state (user_id, warnings, muted_until, updated_at)
+            VALUES ($1, $2, $3, $4)
+            ON CONFLICT (user_id) DO UPDATE SET
+                warnings = EXCLUDED.warnings,
+                muted_until = EXCLUDED.muted_until,
+                updated_at = EXCLUDED.updated_at
             """,
-            (key, value, _now()),
+            user_id,
+            warnings,
+            muted_until,
+            now,
         )
 
 
+async def get_app_state(key: str) -> str | None:
+    pool = await _get_pool()
+    async with pool.acquire() as connection:
+        row = await connection.fetchrow(
+            "SELECT value FROM app_state WHERE key = $1",
+            key,
+        )
+    return row["value"] if row else None
+
+
 async def set_app_state(key: str, value: str) -> None:
-    await asyncio.to_thread(_set_app_state_sync, key, value)
+    pool = await _get_pool()
+    async with pool.acquire() as connection:
+        await connection.execute(
+            """
+            INSERT INTO app_state (key, value, updated_at)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (key) DO UPDATE SET
+                value = EXCLUDED.value,
+                updated_at = EXCLUDED.updated_at
+            """,
+            key,
+            value,
+            _now(),
+        )
 
 
-def _get_tickets_for_period_sync(
+async def get_tickets_for_period(
     start_iso: str,
     end_iso: str,
 ) -> list[TicketReportRow]:
-    with _connect() as connection:
-        rows = connection.execute(
+    pool = await _get_pool()
+    async with pool.acquire() as connection:
+        rows = await connection.fetch(
             """
             SELECT
                 id, user_id, user_name, username, question, status,
                 operator_name, created_at, updated_at, closed_at
             FROM tickets
-            WHERE created_at >= ? AND created_at < ?
+            WHERE created_at >= $1 AND created_at < $2
             ORDER BY id
             """,
-            (start_iso, end_iso),
-        ).fetchall()
+            start_iso,
+            end_iso,
+        )
     return [
         TicketReportRow(
             id=row["id"],
@@ -515,10 +472,3 @@ def _get_tickets_for_period_sync(
         )
         for row in rows
     ]
-
-
-async def get_tickets_for_period(
-    start_iso: str,
-    end_iso: str,
-) -> list[TicketReportRow]:
-    return await asyncio.to_thread(_get_tickets_for_period_sync, start_iso, end_iso)

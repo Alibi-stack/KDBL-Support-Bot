@@ -16,7 +16,8 @@ rag_engine.py — поиск по базе знаний (RAG retrieval).
 
 Переменные окружения (.env, читаются через config.get_settings()):
     KB_PATH=knowledge_base.json
-    CHROMA_DIR=./chroma_store
+    CHROMA_HOST=localhost   # в Docker: chromadb (имя сервиса)
+    CHROMA_PORT=8000        # ChromaDB Server (HttpClient)
 """
 
 import json
@@ -74,7 +75,8 @@ def _get_collection():
 
     kb = load_knowledge_base()
     embedder = _get_embedder()
-    chroma_client = chromadb.PersistentClient(path=get_settings().chroma_dir)
+    settings = get_settings()
+    chroma_client = chromadb.HttpClient(host=settings.chroma_host, port=settings.chroma_port)
     collection = chroma_client.get_or_create_collection(name=COLLECTION_NAME)
 
     if collection.count() == 0:
