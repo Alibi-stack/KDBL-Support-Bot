@@ -1,8 +1,10 @@
 import asyncio
 import json
 import logging
+import time
 
 from config import get_settings
+from services import metrics
 
 logger = logging.getLogger(__name__)
 
@@ -50,17 +52,22 @@ async def get_ai_response(
     settings = get_settings()
     provider = settings.ai_provider.lower()
 
-    if provider == "groq" and settings.groq_api_key:
-        try:
-            return await asyncio.wait_for(
-                _get_groq_response(user_text, history or [], language),
-                timeout=settings.ai_request_timeout,
-            )
-        except (AIServiceError, TimeoutError, asyncio.TimeoutError):
-            logger.exception("Groq unavailable, using local fallback")
-            return await _get_local_it_fallback(user_text, history or [], language)
+    start = time.monotonic()
+    try:
+        if provider == "groq" and settings.groq_api_key:
+            try:
+                return await asyncio.wait_for(
+                    _get_groq_response(user_text, history or [], language),
+                    timeout=settings.ai_request_timeout,
+                )
+            except (AIServiceError, TimeoutError, asyncio.TimeoutError):
+                logger.exception("Groq unavailable, using local fallback")
+                metrics.ai_errors_total.inc()
+                return await _get_local_it_fallback(user_text, history or [], language)
 
-    return await _get_stub_response(user_text, language)
+        return await _get_stub_response(user_text, language)
+    finally:
+        metrics.ai_response_seconds.observe(time.monotonic() - start)
 
 
 async def _get_stub_response(user_text: str, language: str = "ru") -> str:

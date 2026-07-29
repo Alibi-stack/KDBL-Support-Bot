@@ -27,3 +27,12 @@ groups:
         annotations:
           summary: "Слишком много открытых обращений"
           description: "Больше 20 обращений одновременно открыты дольше 10 минут -- операторам может нужна помощь."
+
+      - alert: TelegramRateLimited
+        expr: increase(kdbl_telegram_rate_limited_total[5m]) > 5
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Telegram API отдаёт 429 (Too Many Requests)"
+          description: "Бот получил больше 5 ошибок 429 от Telegram Bot API за последние 5 минут -- возможна задержка доставки сообщений пользователям и операторам."

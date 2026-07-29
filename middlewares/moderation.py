@@ -8,6 +8,7 @@ from typing import Any
 from aiogram import BaseMiddleware
 from aiogram.types import Message, TelegramObject
 
+from services.audit import log_event
 from services.i18n import get_message_language, pick
 from services.ticket_storage import (
     get_moderation_state,
@@ -68,6 +69,12 @@ class ModerationMiddleware(BaseMiddleware):
         language = await get_message_language(event)
         if warnings <= MAX_WARNINGS:
             await set_moderation_state(event.from_user.id, warnings, None)
+            log_event(
+                "user_warned",
+                user_id=event.from_user.id,
+                user_name=event.from_user.full_name,
+                warnings=warnings,
+            )
             await event.answer(
                 pick(
                     language,
@@ -90,6 +97,12 @@ class ModerationMiddleware(BaseMiddleware):
             event.from_user.id,
             0,
             muted_until.isoformat(timespec="seconds"),
+        )
+        log_event(
+            "user_muted",
+            user_id=event.from_user.id,
+            user_name=event.from_user.full_name,
+            muted_until=muted_until.isoformat(timespec="seconds"),
         )
         await event.answer(
             pick(

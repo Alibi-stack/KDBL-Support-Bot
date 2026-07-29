@@ -6,16 +6,15 @@ start_metrics_server(), вызывается один раз из main.py при
 prometheus_client дополнительно публикует стандартные process-метрики
 (CPU, память, GC) сам по себе, без дополнительного кода.
 
-kdbl_tickets_total и kdbl_active_tickets инкрементируются прямо в
-services/ticket_storage.py (create_ticket/close_ticket) -- этот файл уже
-переписывается в рамках миграции на Postgres, поэтому это естественное
-место для подключения счётчиков тикетов.
+kdbl_tickets_total и kdbl_active_tickets инкрементируются в
+services/ticket_storage.py (create_ticket/close_ticket).
 
-kdbl_messages_total, kdbl_ai_response_seconds и kdbl_ai_errors_total
-объявлены и готовы к использованию, но не подключены к handlers/*.py и
-services/ai_client.py в этой миграции (эти файлы сознательно не
-трогаются, см. план). Подключить их -- дело одной строки в нужном месте
-в следующей итерации.
+kdbl_messages_total инкрементируется в handlers/*.py в точках входа
+сообщений (ai/ticket/command). kdbl_ai_response_seconds и
+kdbl_ai_errors_total инкрементируются в services/ai_client.py вокруг
+вызова провайдера AI. kdbl_telegram_rate_limited_total инкрементируется
+в main.py через глобальный error handler на TelegramRetryAfter (HTTP 429
+от Telegram Bot API).
 """
 
 import logging
@@ -49,6 +48,11 @@ tickets_total = Counter(
 active_tickets = Gauge(
     "kdbl_active_tickets",
     "Текущее количество открытых обращений (open + in_progress)",
+)
+
+telegram_rate_limited_total = Counter(
+    "kdbl_telegram_rate_limited_total",
+    "Количество ошибок 429 (Too Many Requests) от Telegram Bot API",
 )
 
 

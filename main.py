@@ -3,14 +3,17 @@ import logging
 
 from aiogram import Bot, Dispatcher
 from aiogram.client.session.aiohttp import AiohttpSession
-from aiogram.exceptions import TelegramNetworkError
+from aiogram.exceptions import TelegramNetworkError, TelegramRetryAfter
+from aiogram.filters import ExceptionTypeFilter
 from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.types import ErrorEvent
 from pythonjsonlogger.json import JsonFormatter
 
 from config import get_settings
 from handlers import setup_routers
 from middlewares.moderation import ModerationMiddleware
 from middlewares.rate_limit import RateLimitMiddleware
+from services import metrics
 from services.metrics import start_metrics_server
 from services.reports import daily_report_loop
 from services.ticket_storage import init_db
@@ -38,6 +41,22 @@ def configure_logging() -> None:
     root_logger.addHandler(handler)
 
 
+async def handle_telegram_rate_limit(event: ErrorEvent) -> None:
+    """Глобальный error handler на TelegramRetryAfter (HTTP 429 от Telegram
+    Bot API). Ловит 429 с любого исходящего вызова бота (send_message и
+    т.д.), не требуя try/except в каждом хендлере -- увеличивает метрику
+    для алерта TelegramRateLimited (см. monitoring/alert_rules.yml)."""
+    error = event.exception
+    if not isinstance(error, TelegramRetryAfter):
+        return
+    metrics.telegram_rate_limited_total.inc()
+    logging.warning(
+        "Telegram API вернул 429, retry_after=%s секунд",
+        error.retry_after,
+        extra={"retry_after": error.retry_after},
+    )
+
+
 async def main() -> None:
     configure_logging()
 
@@ -51,6 +70,10 @@ async def main() -> None:
     dispatcher = Dispatcher(storage=MemoryStorage())
     dispatcher.message.middleware(RateLimitMiddleware())
     dispatcher.message.middleware(ModerationMiddleware())
+    dispatcher.errors.register(
+        handle_telegram_rate_limit,
+        ExceptionTypeFilter(TelegramRetryAfter),
+    )
     dispatcher.include_router(setup_routers())
     asyncio.create_task(daily_report_loop(bot))
 

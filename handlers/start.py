@@ -10,6 +10,7 @@ from aiogram.types import CallbackQuery, Message
 
 from config import get_settings
 from keyboards.inline import back_to_menu_keyboard, language_keyboard, main_menu_keyboard
+from services import metrics
 from services.reports import build_daily_ticket_report
 from services.ticket_storage import get_user_language, set_user_language
 
@@ -50,6 +51,7 @@ LANGUAGE_PROMPT = (
 
 @router.message(CommandStart())
 async def command_start(message: Message, state: FSMContext) -> None:
+    metrics.messages_total.labels(type="command").inc()
     await state.clear()
     language = await get_user_language(message.from_user.id)
     if language is None:
