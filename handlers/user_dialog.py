@@ -13,6 +13,7 @@ from keyboards.reply import cancel_keyboard
 from handlers.start import is_work_time
 from services.ai_client import AIServiceError, get_ai_response
 from services.i18n import get_message_language, pick
+from services.ticket_storage import get_user_language
 from states.user_states import UserDialog
 from utils import split_long_message
 
@@ -27,7 +28,7 @@ AI_UNAVAILABLE_TEXT = (
 
 @router.callback_query(F.data == "ask_ai")
 async def ask_ai(callback: CallbackQuery, state: FSMContext) -> None:
-    language = await get_message_language(callback.message)
+    language = await get_user_language(callback.from_user.id) or "ru"
     await state.set_state(UserDialog.waiting_question)
     await state.update_data(ai_history=[])
     await callback.message.answer(
