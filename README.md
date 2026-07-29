@@ -1,9 +1,74 @@
 # KDBL Support
 
-Telegram-бот IT-поддержки на aiogram 3.x: AI-заглушка, тикеты,
-операторская группа и SQLite-история обращений.
+Telegram-бот IT-поддержки на aiogram 3.x: AI-ответы, тикеты,
+операторская группа, PostgreSQL, ChromaDB, Prometheus/Grafana и Superset.
 
 ## Быстрый старт
+
+Рекомендуемый запуск — через Docker Desktop. Бот работает, пока запущены
+Docker Desktop и контейнеры проекта.
+
+1. Установите и запустите Docker Desktop.
+2. Скопируйте `.env.example` в `.env` и заполните секреты.
+3. Запустите сервисы:
+
+```powershell
+cd "C:\Users\Alibi\Desktop\AI KDBL\my_ai_bot"
+docker compose up -d --build
+```
+
+Первый запуск может занять долго: Docker скачивает образы и собирает контейнеры.
+Если скачивание падает с `EOF`, повторите команду или заранее скачайте образы:
+
+```powershell
+docker pull postgres:16
+docker pull python:3.13-slim
+docker pull prom/alertmanager:latest
+docker pull prom/prometheus:latest
+docker pull grafana/grafana:latest
+docker pull chromadb/chroma:latest
+```
+
+Проверить статус:
+
+```powershell
+docker compose ps
+```
+
+Проверить логи бота:
+
+```powershell
+docker compose logs -f bot
+```
+
+В логах должна появиться строка `Telegram connection OK`.
+
+Полезные адреса:
+
+- Grafana: http://localhost:3000
+- Prometheus: http://localhost:9090
+- Alertmanager: http://localhost:9093
+- Superset: http://localhost:8088
+- ChromaDB: http://localhost:8000
+
+Остановить все сервисы:
+
+```powershell
+docker compose down
+```
+
+После перезагрузки компьютера снова откройте Docker Desktop и выполните:
+
+```powershell
+cd "C:\Users\Alibi\Desktop\AI KDBL\my_ai_bot"
+docker compose up -d
+```
+
+## Локальный запуск без Docker
+
+Локальный запуск сложнее: отдельно нужны PostgreSQL и ChromaDB. Для Docker
+используйте `DATABASE_URL` с хостом `postgres`, для локального запуска — с
+хостом `localhost`.
 
 ```powershell
 python -m venv venv
@@ -29,7 +94,13 @@ python main.py
 
 ## Как выключить бота
 
-Если бот запущен в черном окне, нажмите `Ctrl+C`, затем подтвердите `Y`.
+При Docker-запуске:
+
+```powershell
+docker compose down
+```
+
+При локальном запуске в PowerShell нажмите `Ctrl+C`, затем подтвердите `Y`.
 
 ## Интеграция с AI
 
