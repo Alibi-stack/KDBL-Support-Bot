@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     env_secret_key: str | None = Field(default=None, alias="ENV_SECRET_KEY")
     bot_token: str = Field(alias="BOT_TOKEN")
     admin_chat_id: int | None = Field(default=None, alias="ADMIN_CHAT_ID")
+    rate_limit_messages: int = Field(default=5, alias="RATE_LIMIT_MESSAGES")
+    rate_limit_window: int = Field(default=10, alias="RATE_LIMIT_WINDOW")
     ai_request_timeout: int = Field(default=60, alias="AI_REQUEST_TIMEOUT")
     database_path: str = Field(default="support.db", alias="DATABASE_PATH")
     ai_provider: str = Field(default="stub", alias="AI_PROVIDER")

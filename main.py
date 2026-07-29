@@ -9,6 +9,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from config import get_settings
 from handlers import setup_routers
 from middlewares.moderation import ModerationMiddleware
+from middlewares.rate_limit import RateLimitMiddleware
 from services.reports import daily_report_loop
 from services.ticket_storage import init_db
 
@@ -26,6 +27,8 @@ async def main() -> None:
     session = AiohttpSession(timeout=45)
     bot = Bot(token=settings.bot_token, session=session)
     dispatcher = Dispatcher(storage=MemoryStorage())
+    dispatcher.message.middleware(RateLimitMiddleware())
+    dispatcher.message.middleware(ModerationMiddleware())
     dispatcher.message.middleware(ModerationMiddleware())
     dispatcher.include_router(setup_routers())
     asyncio.create_task(daily_report_loop(bot))
