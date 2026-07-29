@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     ai_request_timeout: int = Field(default=60, alias="AI_REQUEST_TIMEOUT")
     database_path: str = Field(default="support.db", alias="DATABASE_PATH")
     ai_provider: str = Field(default="stub", alias="AI_PROVIDER")
+    gemini_api_key: str | None = Field(default=None, alias="GEMINI_API_KEY")
     groq_api_key: str | None = Field(default=None, alias="GROQ_API_KEY")
     groq_model: str = Field(default="llama-3.3-70b-versatile", alias="GROQ_MODEL")
     use_forum_topics: bool = Field(default=True, alias="USE_FORUM_TOPICS")
@@ -26,7 +27,7 @@ class Settings(BaseSettings):
     report_hour: int = Field(default=18, alias="REPORT_HOUR")
     duty_contact: str | None = Field(default=None, alias="DUTY_CONTACT")
 
-    @field_validator("bot_token", "groq_api_key", mode="before")
+    @field_validator("bot_token", "gemini_api_key", "groq_api_key", mode="before")
     @classmethod
     def decrypt_secret_values(cls, value: object, info: ValidationInfo) -> object:
         secret_key = info.data.get("env_secret_key") if info.data else None
@@ -42,6 +43,13 @@ class Settings(BaseSettings):
     @field_validator("groq_api_key", mode="before")
     @classmethod
     def empty_groq_api_key_to_none(cls, value: object) -> object:
+        if value == "":
+            return None
+        return value
+
+    @field_validator("gemini_api_key", mode="before")
+    @classmethod
+    def empty_gemini_api_key_to_none(cls, value: object) -> object:
         if value == "":
             return None
         return value
