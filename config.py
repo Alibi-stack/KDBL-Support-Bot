@@ -8,6 +8,9 @@ class Settings(BaseSettings):
     bot_token: str = Field(alias="BOT_TOKEN")
     admin_chat_id: int | None = Field(default=None, alias="ADMIN_CHAT_ID")
     ai_request_timeout: int = Field(default=60, alias="AI_REQUEST_TIMEOUT")
+    # Используется middlewares/rate_limit.py
+    rate_limit_messages: int = Field(default=5, alias="RATE_LIMIT_MESSAGES")
+    rate_limit_window: int = Field(default=10, alias="RATE_LIMIT_WINDOW")
     database_url: str = Field(
         default="postgresql://kdbl:kdbl@localhost:5432/support",
         alias="DATABASE_URL",
