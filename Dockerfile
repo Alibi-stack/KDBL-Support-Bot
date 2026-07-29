@@ -10,7 +10,11 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+
+# CPU-only PyTorch (~100-200 MB). Без этого pip тянет CUDA/NVIDIA-пакеты
+# на несколько GB — на Parallels/Ubuntu GPU нет, они не нужны.
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu \
+    && pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
