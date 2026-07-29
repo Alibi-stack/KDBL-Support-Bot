@@ -331,13 +331,20 @@ def _generate_groq_text(
             "Поле answer пиши на русском языке."
         )
 
+    user_instruction = (
+        "Пайдаланушы қазақ тілін таңдады. Жауапты JSON форматында қайтар: "
+        'answer өрісі тек қазақ тілінде болсын, орысша сөйлем қоспа.'
+        if language == "kz"
+        else "Сформируй ответ строго в формате JSON, как указано в инструкции выше."
+    )
+
     response = client.chat.completions.create(
         model=settings.groq_model,
         messages=[
             {"role": "system", "content": system_prompt},
             {
                 "role": "user",
-                "content": "Сформируй ответ строго в формате JSON, как указано в инструкции выше.",
+                "content": user_instruction,
             },
         ],
         temperature=0.4,
@@ -349,7 +356,81 @@ def _generate_groq_text(
     if not raw_text:
         raise AIServiceError("Groq returned an empty response")
 
-    return _parse_ai_answer(raw_text.strip(), matched_faq_ids)
+    answer = _parse_ai_answer(raw_text.strip(), matched_faq_ids)
+    if language == "kz" and _looks_like_russian_answer(answer):
+        logger.warning("Groq returned Russian answer for Kazakh user language, rewriting")
+        return _rewrite_answer_to_kazakh(client, settings.groq_model, answer, user_text)
+
+    return answer
+
+
+def _rewrite_answer_to_kazakh(client, model: str, answer: str, user_text: str) -> str:
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "Сен IT қолдау мәтінін қазақ тіліне қайта жазатын көмекшісің. "
+                        "Мағынаны сақта, қысқа әрі түсінікті жаз. Орысша сөйлем қоспа. "
+                        "Тек JSON қайтар: {\"answer\":\"...\"}"
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": (
+                        f"Пайдаланушы сұрағы: {user_text}\n\n"
+                        f"Орысша жауапты қазақшаға қайта жаз:\n{answer}"
+                    ),
+                },
+            ],
+            temperature=0.2,
+            max_tokens=600,
+            response_format={"type": "json_object"},
+        )
+        raw_text = response.choices[0].message.content if response.choices else None
+        if not raw_text:
+            raise AIServiceError("Groq returned an empty rewrite response")
+        rewritten = _parse_ai_answer(raw_text.strip(), [])
+        if _looks_like_russian_answer(rewritten):
+            raise AIServiceError("Groq rewrite still looks Russian")
+        return rewritten
+    except Exception:
+        logger.exception("Cannot rewrite Russian answer to Kazakh, using Kazakh fallback")
+        return _get_local_it_fallback_kz(user_text)
+
+
+def _looks_like_russian_answer(answer: str) -> bool:
+    lowered = f" {answer.lower()} "
+    russian_markers = (
+        " здравствуйте",
+        " пожалуйста",
+        " попробуйте",
+        " проверьте",
+        " перезагруз",
+        " если ",
+        " проблема",
+        " оператор",
+        " готов помочь",
+        " отправьте",
+        " подключ",
+    )
+    kazakh_markers = (
+        " сәлем",
+        " өтініш",
+        " тексер",
+        " көріңіз",
+        " қос",
+        " қайта",
+        " мәселе",
+        " көмектес",
+        " жазыңыз",
+        " жібер",
+    )
+    russian_score = sum(marker in lowered for marker in russian_markers)
+    kazakh_score = sum(marker in lowered for marker in kazakh_markers)
+    return russian_score >= 2 and russian_score > kazakh_score
 
 
 def _parse_ai_answer(raw_text: str, matched_faq_ids: list[str]) -> str:
