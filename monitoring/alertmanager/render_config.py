@@ -58,6 +58,18 @@ receivers:
       - bot_token: '{bot_token}'
         chat_id: {chat_id or 0}{thread_line}
         parse_mode: 'HTML'
+        message: |-
+          {{{{- range .Alerts }}}}
+          🚨 <b>{{{{ .Labels.alertname }}}}</b>
+          Статус: {{{{ .Status }}}}
+          Важность: {{{{ .Labels.severity }}}}
+          {{{{- if .Annotations.summary }}}}
+          Кратко: {{{{ .Annotations.summary }}}}
+          {{{{- end }}}}
+          {{{{- if .Annotations.description }}}}
+          Описание: {{{{ .Annotations.description }}}}
+          {{{{- end }}}}
+          {{{{- end }}}}
 """
 
     os.makedirs(os.path.dirname(OUTPUT_PATH), exist_ok=True)
