@@ -67,7 +67,15 @@ echo "----- H3: load superset_config values -----"
 python - <<'PY' 2>&1 | tee /tmp/h3_config.txt
 import os, json, sys
 path = os.environ.get("SUPERSET_CONFIG_PATH", "/app/pythonpath/superset_config.py")
-out = {"loaded": False, "has_secret": False, "has_uri": False, "uri_safe": None, "error": None}
+out = {
+    "loaded": False,
+    "has_secret": False,
+    "overrides_sqlalchemy_uri": False,
+    "uri_safe": None,
+    "uses_sqlite_metadata_expected": True,
+    "error": None,
+    "runId": "post-fix",
+}
 try:
     ns = {}
     with open(path, encoding="utf-8") as f:
@@ -76,16 +84,14 @@ try:
     out["loaded"] = True
     sk = ns.get("SECRET_KEY") or ""
     out["has_secret"] = bool(sk) and sk != "CHANGE_ME_TO_A_COMPLEX_RANDOM_SECRET"
-    uri = ns.get("SQLALCHEMY_DATABASE_URI") or ""
-    out["has_uri"] = bool(uri)
-    if "://" in uri:
-        # mask credentials
+    # После фикса SQLALCHEMY_DATABASE_URI не должен задаваться в конфиге
+    uri = ns.get("SQLALCHEMY_DATABASE_URI")
+    out["overrides_sqlalchemy_uri"] = uri is not None
+    if isinstance(uri, str) and "://" in uri:
         scheme, rest = uri.split("://", 1)
         if "@" in rest:
             rest = "***:***@" + rest.split("@", 1)[1]
         out["uri_safe"] = f"{scheme}://{rest}"
-    else:
-        out["uri_safe"] = uri[:40] if uri else None
 except Exception as e:
     out["error"] = f"{type(e).__name__}:{e}"
 print(json.dumps(out))

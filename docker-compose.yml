@@ -131,36 +131,40 @@ services:
     networks:
       - kdbl-network
 
+  # Metadata Superset = SQLite в volume; Postgres `support` — datasource через UI.
+  # Свой образ: lean apache/superset без psycopg2, драйвер нужен для UI-datasource.
   superset-init:
-    image: apache/superset:latest
+    build:
+      context: ./superset
+      dockerfile: Dockerfile
+    image: kdbl-superset:local
     container_name: kdbl-superset-init
     depends_on:
       postgres:
         condition: service_healthy
     environment:
-      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY:-change_me_to_a_long_random_string_please}
-      DATABASE_URL: ${DATABASE_URL:-postgresql://kdbl:${POSTGRES_PASSWORD:-kdbl}@postgres:5432/support}
+      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY:-kdbl-superset-dev-secret-change-me-in-production-please-32b}
       SUPERSET_CONFIG_PATH: /app/pythonpath/superset_config.py
       SUPERSET_ADMIN_PASSWORD: ${SUPERSET_ADMIN_PASSWORD:-admin}
     volumes:
       - ./superset/superset_config.py:/app/pythonpath/superset_config.py:ro
       - ./superset/init.sh:/app/pythonpath/init.sh:ro
       - superset_home:/app/superset_home
+    user: root
     entrypoint: ["/bin/sh", "/app/pythonpath/init.sh"]
     restart: "no"
     networks:
       - kdbl-network
 
   superset:
-    image: apache/superset:latest
+    image: kdbl-superset:local
     container_name: kdbl-superset
     restart: unless-stopped
     depends_on:
       superset-init:
         condition: service_completed_successfully
     environment:
-      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY:-change_me_to_a_long_random_string_please}
-      DATABASE_URL: ${DATABASE_URL:-postgresql://kdbl:${POSTGRES_PASSWORD:-kdbl}@postgres:5432/support}
+      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY:-kdbl-superset-dev-secret-change-me-in-production-please-32b}
       SUPERSET_CONFIG_PATH: /app/pythonpath/superset_config.py
     volumes:
       - ./superset/superset_config.py:/app/pythonpath/superset_config.py:ro
