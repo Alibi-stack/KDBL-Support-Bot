@@ -25,7 +25,6 @@ class Settings(BaseSettings):
     groq_model: str = Field(default="llama-3.3-70b-versatile", alias="GROQ_MODEL")
     use_forum_topics: bool = Field(default=True, alias="USE_FORUM_TOPICS")
     kb_path: str = Field(default="knowledge_base.json", alias="KB_PATH")
-    chroma_dir: str = Field(default="./chroma_store", alias="CHROMA_DIR")
     chroma_host: str = Field(default="localhost", alias="CHROMA_HOST")
     chroma_port: int = Field(default=8000, alias="CHROMA_PORT")
     use_vector_rag: bool = Field(default=False, alias="USE_VECTOR_RAG")

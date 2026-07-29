@@ -90,8 +90,6 @@ python main.py
 .\venv\Scripts\python.exe main.py
 ```
 
-Или откройте `start_bot.bat`.
-
 ## Как выключить бота
 
 При Docker-запуске:
