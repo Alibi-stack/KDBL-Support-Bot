@@ -33,6 +33,7 @@ from keyboards.inline import (
 from keyboards.reply import cancel_keyboard
 from services.ai_client import AIServiceError, get_ai_response
 from services.i18n import get_message_language, pick
+from services.operator_intent import build_operator_ticket_question, is_operator_request
 from services.ticket_storage import (
     add_message,
     assign_ticket,
@@ -492,6 +493,15 @@ async def forward_user_message_to_operator(message: Message, state: FSMContext) 
 
     ticket = await get_active_ticket_by_user(user.id)
     if ticket is None:
+        if is_operator_request(message.text):
+            data = await state.get_data()
+            question = build_operator_ticket_question(
+                message.text,
+                data.get("last_question"),
+            )
+            await create_support_ticket(message, state, question)
+            return
+
         # У пользователя нет открытого тикета оператору: сначала пробуем
         # ответить через RAG-пайплайн (база знаний + Grok), и только если
         # это не помогло — предлагаем создать тикет.

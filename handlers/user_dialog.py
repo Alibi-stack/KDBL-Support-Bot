@@ -13,6 +13,7 @@ from keyboards.reply import cancel_keyboard
 from handlers.start import is_work_time
 from services.ai_client import AIServiceError, get_ai_response
 from services.i18n import get_message_language, pick
+from services.operator_intent import build_operator_ticket_question, is_operator_request
 from services.ticket_storage import get_user_language
 from states.user_states import UserDialog
 from utils import split_long_message
@@ -65,6 +66,17 @@ async def handle_ai_question(message: Message, state: FSMContext) -> None:
     language = await get_message_language(message)
     data = await state.get_data()
     history = data.get("ai_history", [])
+
+    if is_operator_request(message.text):
+        from handlers.support import create_support_ticket
+
+        question = build_operator_ticket_question(
+            message.text,
+            data.get("last_question"),
+        )
+        await create_support_ticket(message, state, question)
+        return
+
     await message.bot.send_chat_action(message.chat.id, ChatAction.TYPING)
     processing_message = await message.answer(
         pick(language, "Запрос обрабатывается...", "Сұраныс өңделіп жатыр..."),
