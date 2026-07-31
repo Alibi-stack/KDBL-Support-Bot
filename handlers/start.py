@@ -15,6 +15,7 @@ from keyboards.inline import (
     main_menu_keyboard,
 )
 from keyboards.reply import mini_app_launch_keyboard
+from services import metrics
 from services.reports import build_daily_ticket_report
 from services.ticket_storage import get_user_language, set_user_language
 
@@ -55,6 +56,7 @@ LANGUAGE_PROMPT = (
 
 @router.message(CommandStart())
 async def command_start(message: Message, state: FSMContext) -> None:
+    metrics.messages_total.labels(type="command").inc()
     await state.clear()
     language = await get_user_language(message.from_user.id)
     if language is None:

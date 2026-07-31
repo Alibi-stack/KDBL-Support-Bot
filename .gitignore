@@ -18,3 +18,4 @@ chroma_data/
 prometheus_data/
 grafana_data/
 superset_home/
+.DS_Store

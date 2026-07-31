@@ -35,7 +35,9 @@ from keyboards.inline import (
     ticket_transfer_keyboard,
 )
 from keyboards.reply import cancel_keyboard
+from services import metrics
 from services.ai_client import AIServiceError, get_ai_response
+from services.audit import log_event
 from services.i18n import get_message_language, pick
 from services.operator_intent import build_operator_ticket_question, is_operator_request
 from services.ticket_routing import ALLOWED_DEPARTMENTS, RoutingDecision, classify_ticket_route
@@ -342,6 +344,13 @@ async def take_ticket(callback: CallbackQuery) -> None:
         await callback.answer("Обращение не найдено", show_alert=True)
         return
 
+    log_event(
+        "ticket_assigned",
+        ticket_id=ticket.id,
+        operator_id=user.id,
+        operator_name=user.full_name,
+    )
+
     ticket = await ensure_ticket_topic(callback, ticket) or ticket
 
     topic_url = None
@@ -385,10 +394,23 @@ async def transfer_ticket(callback: CallbackQuery) -> None:
         await callback.answer("Тикет уже закрыт", show_alert=True)
         return
 
+    previous_operator_id = ticket.operator_id
+    previous_operator_name = ticket.operator_name
+
     ticket = await release_ticket(ticket_id)
     if ticket is None:
         await callback.answer("Не удалось передать тикет", show_alert=True)
         return
+
+    transferred_by = callback.from_user
+    log_event(
+        "ticket_transferred",
+        ticket_id=ticket.id,
+        previous_operator_id=previous_operator_id,
+        previous_operator_name=previous_operator_name,
+        transferred_by_id=transferred_by.id if transferred_by else None,
+        transferred_by_name=transferred_by.full_name if transferred_by else None,
+    )
 
     try:
         keyboard = (
@@ -484,11 +506,22 @@ async def reassign_ticket_department(callback: CallbackQuery) -> None:
 @router.callback_query(F.data.startswith("ticket_close:"))
 async def close_ticket_callback(callback: CallbackQuery) -> None:
     ticket_id = int(callback.data.split(":", 1)[1])
+    ticket_before = await get_ticket(ticket_id)
     ticket = await close_ticket(ticket_id)
 
     if ticket is None:
         await callback.answer("Обращение не найдено", show_alert=True)
         return
+
+    closed_by = callback.from_user
+    log_event(
+        "ticket_closed",
+        ticket_id=ticket.id,
+        closed_by_id=closed_by.id if closed_by else None,
+        closed_by_name=closed_by.full_name if closed_by else None,
+        assigned_operator_id=ticket_before.operator_id if ticket_before else None,
+        assigned_operator_name=ticket_before.operator_name if ticket_before else None,
+    )
 
     deleted_callback_message = await delete_callback_message_if_general(callback)
     if not deleted_callback_message:
@@ -750,6 +783,7 @@ async def forward_user_photo_to_operator(message: Message) -> None:
         )
         return
 
+    metrics.messages_total.labels(type="ticket").inc()
     caption = message.caption or "Фото/скриншот от пользователя."
     await add_message(ticket.id, "user", user.id, user.full_name, f"[photo] {caption}")
     await send_admin_photo_message(
@@ -802,6 +836,7 @@ async def forward_user_message_to_operator(message: Message, state: FSMContext) 
         )
         return
 
+    metrics.messages_total.labels(type="ticket").inc()
     await add_message(ticket.id, "user", user.id, user.full_name, message.text)
     await send_admin_ticket_message(
         message,
@@ -867,6 +902,7 @@ async def answer_with_rag(message: Message, state: FSMContext) -> None:
     пока у него нет открытого тикета оператору. Если AI недоступен или
     ошибся — вежливо сообщаем об этом и предлагаем создать тикет, а не
     роняем обработчик."""
+    metrics.messages_total.labels(type="ai").inc()
     data = await state.get_data()
     history = data.get("ai_history", [])
     language = await get_message_language(message)
@@ -913,6 +949,7 @@ async def create_support_ticket(
     user_override=None,
     notify_user: bool = True,
 ) -> None:
+    metrics.messages_total.labels(type="ticket").inc()
     settings = get_settings()
 
     if settings.admin_chat_id is None:
@@ -996,6 +1033,13 @@ async def create_support_ticket(
             message_thread_id=target_thread_id,
         )
         await set_ticket_admin_message(ticket.id, admin_message.message_id)
+        log_event(
+            "ticket_created",
+            ticket_id=ticket.id,
+            user_id=user_id,
+            user_name=user_name,
+            username=username,
+        )
     except Exception:
         logger.exception("Cannot create support ticket")
         if not notify_user:
@@ -1026,6 +1070,14 @@ async def handle_operator_message(message: Message, ticket_id: int) -> None:
     operator = message.from_user
     operator_name = operator.full_name if operator else "operator"
     operator_id = operator.id if operator else message.chat.id
+
+    log_event(
+        "operator_message",
+        ticket_id=ticket_id,
+        operator_id=operator_id,
+        operator_name=operator_name,
+        message_type="photo" if message.photo else "text",
+    )
 
     if message.text:
         await send_operator_text_to_user(

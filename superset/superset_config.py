@@ -7,9 +7,10 @@ volume superset_home -- так рекомендует MVP-план: Postgres `su
 (Add Database -> postgresql://kdbl:***@postgres:5432/support).
 
 Официальный образ apache/superset:latest (lean) НЕ включает psycopg2.
-Поэтому SQLALCHEMY_DATABASE_URI нельзя насильно ставить на Postgres
-без отдельной установки драйвера -- иначе `superset db upgrade` падает
-с exit 1 (ModuleNotFoundError: psycopg2).
+Драйвер ставится в Dockerfile через /app/.venv/bin/pip (не system pip),
+иначе UI datasource Test connection падает с
+"Could not load database driver for: postgresql". Metadata Superset
+оставляем на SQLite -- URI Postgres только для datasource в UI.
 """
 
 import os
