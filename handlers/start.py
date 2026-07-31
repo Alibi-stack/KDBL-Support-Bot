@@ -86,6 +86,11 @@ async def command_app(message: Message) -> None:
     )
 
 
+@router.message(F.text == "Сменить язык / Тілді ауыстыру")
+async def message_change_language(message: Message) -> None:
+    await message.answer(LANGUAGE_PROMPT, reply_markup=language_keyboard())
+
+
 @router.message(Command("forum_status"))
 async def command_forum_status(message: Message) -> None:
     chat = await message.bot.get_chat(message.chat.id)
