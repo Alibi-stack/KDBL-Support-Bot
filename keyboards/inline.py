@@ -1,4 +1,4 @@
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 
 
 def language_keyboard() -> InlineKeyboardMarkup:
@@ -28,6 +28,20 @@ def main_menu_keyboard() -> InlineKeyboardMarkup:
                     callback_data="change_language",
                 )
             ],
+        ]
+    )
+
+
+def mini_app_keyboard(mini_app_url: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="Открыть KDBL Mini App",
+                    web_app=WebAppInfo(url=mini_app_url),
+                )
+            ],
+            [InlineKeyboardButton(text="Главное меню", callback_data="main_menu")],
         ]
     )
 
@@ -176,6 +190,12 @@ def ticket_claim_keyboard(ticket_id: int) -> InlineKeyboardMarkup:
                     text="Закрыть",
                     callback_data=f"ticket_close:{ticket_id}",
                 ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text="РњР°СЂС€СЂСѓС‚",
+                    callback_data=f"ticket_route_menu:{ticket_id}",
+                ),
             ]
         ]
     )
@@ -194,6 +214,24 @@ def ticket_transfer_keyboard(ticket_id: int) -> InlineKeyboardMarkup:
                     callback_data=f"ticket_close:{ticket_id}",
                 ),
             ]
+        ]
+    )
+
+
+def ticket_route_keyboard(ticket_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="operator", callback_data=f"ticket_route:{ticket_id}:operator"),
+                InlineKeyboardButton(text="developer", callback_data=f"ticket_route:{ticket_id}:developer"),
+            ],
+            [
+                InlineKeyboardButton(text="documents", callback_data=f"ticket_route:{ticket_id}:documents"),
+                InlineKeyboardButton(text="bot_admin", callback_data=f"ticket_route:{ticket_id}:bot_admin"),
+            ],
+            [
+                InlineKeyboardButton(text="unknown / triage", callback_data=f"ticket_route:{ticket_id}:unknown"),
+            ],
         ]
     )
 

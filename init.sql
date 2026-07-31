@@ -18,6 +18,15 @@ CREATE TABLE IF NOT EXISTS tickets (
     admin_chat_id BIGINT,
     admin_message_id BIGINT,
     admin_thread_id BIGINT,
+    department TEXT NOT NULL DEFAULT 'unknown',
+    routing_status TEXT NOT NULL DEFAULT 'needs_review',
+    routing_confidence INTEGER,
+    routing_reason TEXT,
+    clarification_question TEXT,
+    clarification_count INTEGER NOT NULL DEFAULT 0,
+    initial_department TEXT,
+    final_department TEXT,
+    routed_at TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     closed_at TEXT
@@ -35,6 +44,28 @@ CREATE TABLE IF NOT EXISTS ticket_messages (
     text TEXT NOT NULL,
     created_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS ticket_routing_history (
+    id SERIAL PRIMARY KEY,
+    ticket_id INTEGER NOT NULL REFERENCES tickets(id),
+    event_type TEXT NOT NULL,
+    from_department TEXT,
+    to_department TEXT NOT NULL,
+    routing_status TEXT NOT NULL,
+    confidence INTEGER,
+    reason TEXT,
+    clarification_question TEXT,
+    actor_id BIGINT,
+    actor_name TEXT,
+    llm_model TEXT,
+    duration_ms INTEGER,
+    success BOOLEAN NOT NULL DEFAULT TRUE,
+    error_type TEXT,
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_ticket_routing_history_ticket_id
+    ON ticket_routing_history(ticket_id, id);
 
 CREATE TABLE IF NOT EXISTS user_settings (
     user_id BIGINT PRIMARY KEY,

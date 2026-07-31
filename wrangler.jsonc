@@ -1,0 +1,20 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "kdbl-support",
+  "main": "cloudflare/worker.js",
+  "compatibility_date": "2026-07-30",
+  "assets": {
+    "directory": "webapp",
+    "binding": "ASSETS"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "kdbl-support-db",
+      "database_id": "364da710-b134-45db-b855-11d8777b3d73"
+    }
+  ],
+  "vars": {
+    "GROQ_MODEL": "llama-3.3-70b-versatile"
+  }
+}

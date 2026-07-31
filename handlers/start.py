@@ -9,7 +9,12 @@ from aiogram.types import FSInputFile
 from aiogram.types import CallbackQuery, Message
 
 from config import get_settings
-from keyboards.inline import back_to_menu_keyboard, language_keyboard, main_menu_keyboard
+from keyboards.inline import (
+    back_to_menu_keyboard,
+    language_keyboard,
+    main_menu_keyboard,
+)
+from keyboards.reply import mini_app_launch_keyboard
 from services.reports import build_daily_ticket_report
 from services.ticket_storage import get_user_language, set_user_language
 
@@ -64,6 +69,20 @@ async def command_chat_id(message: Message) -> None:
     await message.answer(
         f"Chat: {title}\n"
         f"ADMIN_CHAT_ID={message.chat.id}"
+    )
+
+
+@router.message(Command("app"))
+async def command_app(message: Message) -> None:
+    settings = get_settings()
+    if not settings.mini_app_url:
+        await message.answer(
+            "Mini App уже добавлен в проект. Чтобы открыть его в Telegram, укажите HTTPS-ссылку в MINI_APP_URL."
+        )
+        return
+    await message.answer(
+        "Откройте KDBL Support в формате Mini App:",
+        reply_markup=mini_app_launch_keyboard(settings.mini_app_url),
     )
 
 

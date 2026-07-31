@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>KDBL Support</title>
+  <link rel="stylesheet" href="./styles.css?v=20260731-1235">
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark">K</div>
+        <div>
+          <p>KDBL Support</p>
+          <strong id="sessionLabel">Проверка входа</strong>
+        </div>
+      </div>
+      <nav class="tabs" aria-label="Навигация">
+        <button data-page="main" type="button">Главная</button>
+        <button data-page="work" type="button">Work</button>
+        <button data-page="admin" type="button">Admin</button>
+      </nav>
+    </header>
+
+    <section id="loginPage" class="page auth-page">
+      <div class="auth-card">
+        <h1>Вход в KDBL Support</h1>
+        <p>Пользовательский вход доступен только через Telegram: внутри Mini App по TMA initData или в браузере через Telegram Login Widget.</p>
+        <div id="telegramLoginBox" class="login-box"></div>
+        <p id="loginHint" class="muted">Если вы открыли Mini App из Telegram, вход выполнится автоматически.</p>
+      </div>
+    </section>
+
+    <section id="mainPage" class="page" hidden>
+      <section class="home-panel">
+        <div>
+          <h1>Что открыть?</h1>
+          <p>Для обычной работы создавайте обращения во вкладке Work. Админ-панель открывается отдельным логином и паролем.</p>
+        </div>
+        <div class="home-actions">
+          <button id="homeWorkButton" class="primary-button" type="button">Work</button>
+          <button id="homeAdminButton" type="button">Admin panel</button>
+        </div>
+      </section>
+    </section>
+
+    <section id="workPage" class="page" hidden>
+      <section class="profile-panel">
+        <label>Имя<input id="firstName" autocomplete="given-name"></label>
+        <label>Фамилия<input id="lastName" autocomplete="family-name"></label>
+        <label>Отдел / кабинет<input id="department"></label>
+      </section>
+
+      <div class="work-grid">
+        <section class="panel">
+          <div class="segmented">
+            <button class="is-active" data-mode="ai" type="button">AI</button>
+            <button data-mode="ticket" type="button">Тикет</button>
+          </div>
+          <label id="questionLabel">Вопрос<input class="sr-only" aria-hidden="true"></label>
+          <textarea id="question" rows="8" placeholder="Опишите вопрос или проблему"></textarea>
+          <div id="ticketFields" class="ticket-fields" hidden>
+            <select id="category">
+              <option>Рабочая программа</option>
+              <option>Доступ или пароль</option>
+              <option>Документ или файл</option>
+              <option>Оборудование</option>
+              <option>Другое</option>
+            </select>
+            <select id="priority">
+              <option>Обычный</option>
+              <option>Срочно</option>
+              <option>Не могу работать</option>
+            </select>
+          </div>
+          <button id="submitButton" class="primary-button" type="button">Отправить AI</button>
+        </section>
+
+        <section class="panel chat-panel">
+          <div class="panel-head">
+            <h2 id="chatTitle">Диалог</h2>
+            <button id="clearChatButton" type="button">Очистить</button>
+          </div>
+          <div id="chatMessages" class="chat-messages"></div>
+        </section>
+      </div>
+    </section>
+
+    <section id="adminPage" class="page" hidden>
+      <section id="adminLogin" class="panel admin-login">
+        <h2>Админ-вход</h2>
+        <p class="muted">Вход только по отдельному логину и паролю. Telegram-авторизация здесь не используется.</p>
+        <input id="adminLoginInput" autocomplete="username" placeholder="Логин">
+        <input id="adminPasswordInput" autocomplete="current-password" type="password" placeholder="Пароль">
+        <button id="adminLoginButton" class="primary-button" type="button">Войти</button>
+      </section>
+
+      <section id="adminPanel" hidden>
+        <div class="stats-grid">
+          <article><span>Всего</span><strong id="adminTotal">-</strong></article>
+          <article><span>Открыто</span><strong id="adminOpen">-</strong></article>
+          <article><span>Закрыто</span><strong id="adminClosed">-</strong></article>
+        </div>
+
+        <section class="panel operator-panel">
+          <div class="panel-head">
+            <div>
+              <h2>Работа с тикетами</h2>
+              <p class="muted">Alt+1 оператор, Alt+2 разработчики, Alt+3 документы, Ctrl+Enter отправить, Alt+C закрыть.</p>
+            </div>
+            <button id="refreshAdminButton" type="button">Обновить</button>
+          </div>
+          <div class="operator-workspace">
+            <div>
+              <div class="ticket-filters">
+                <select id="adminTicketStatus">
+                  <option value="active">Активные</option>
+                  <option value="open">Открытые</option>
+                  <option value="in_progress">В работе</option>
+                  <option value="closed">Закрытые</option>
+                  <option value="all">Все</option>
+                </select>
+                <select id="adminTicketDepartment">
+                  <option value="all">Все отделы</option>
+                  <option value="operator">operator</option>
+                  <option value="developer">developer</option>
+                  <option value="documents">documents</option>
+                  <option value="bot_admin">bot_admin</option>
+                  <option value="unknown">unknown</option>
+                </select>
+              </div>
+              <div id="adminTickets" class="ticket-list"></div>
+            </div>
+            <div class="ticket-console">
+              <div id="selectedTicketInfo" class="ticket-info">Выберите тикет слева</div>
+              <div id="adminTicketMessages" class="chat-messages admin-chat"></div>
+              <div class="ticket-actions">
+                <select id="adminRouteDepartment">
+                  <option value="operator">operator</option>
+                  <option value="developer">developer</option>
+                  <option value="documents">documents</option>
+                  <option value="bot_admin">bot_admin</option>
+                  <option value="unknown">unknown</option>
+                </select>
+                <button id="adminRouteButton" type="button">Route</button>
+                <button id="adminCloseTicketButton" type="button">Закрыть</button>
+              </div>
+              <textarea id="adminReplyText" rows="4" placeholder="Ответ операторa пользователю"></textarea>
+              <button id="adminSendReplyButton" class="primary-button" type="button">Отправить ответ</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Пользователи</h2>
+          </div>
+          <div id="adminUsers" class="table-list"></div>
+        </section>
+        <section class="panel">
+          <h2>Статистика закрытых тикетов</h2>
+          <div id="adminStats" class="table-list"></div>
+        </section>
+      </section>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="./app.js?v=20260731-1235"></script>
+</body>
+</html>

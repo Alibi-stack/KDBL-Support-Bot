@@ -1,13 +1,10 @@
 from functools import lru_cache
 
-from pydantic import Field, ValidationInfo, field_validator, model_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
-from services.env_crypto import decrypt_env_value
 
 
 class Settings(BaseSettings):
-    env_secret_key: str | None = Field(default=None, alias="ENV_SECRET_KEY")
     bot_token: str = Field(alias="BOT_TOKEN")
     admin_chat_id: int | None = Field(default=None, alias="ADMIN_CHAT_ID")
     ai_request_timeout: int = Field(default=60, alias="AI_REQUEST_TIMEOUT")
@@ -36,12 +33,19 @@ class Settings(BaseSettings):
     workday_end_hour: int = Field(default=18, alias="WORKDAY_END_HOUR")
     report_hour: int = Field(default=18, alias="REPORT_HOUR")
     duty_contact: str | None = Field(default=None, alias="DUTY_CONTACT")
-
-    @field_validator("bot_token", "gemini_api_key", "groq_api_key", mode="before")
-    @classmethod
-    def decrypt_secret_values(cls, value: object, info: ValidationInfo) -> object:
-        secret_key = info.data.get("env_secret_key") if info.data else None
-        return decrypt_env_value(value, secret_key)
+    mini_app_url: str | None = Field(default=None, alias="MINI_APP_URL")
+    mini_app_api_url: str | None = Field(default=None, alias="MINI_APP_API_URL")
+    mini_app_api_secret: str | None = Field(default=None, alias="MINI_APP_API_SECRET")
+    operator_chat_id: int | None = Field(default=None, alias="OPERATOR_CHAT_ID")
+    developer_chat_id: int | None = Field(default=None, alias="DEVELOPER_CHAT_ID")
+    documents_chat_id: int | None = Field(default=None, alias="DOCUMENTS_CHAT_ID")
+    bot_admin_chat_id: int | None = Field(default=None, alias="BOT_ADMIN_CHAT_ID")
+    triage_chat_id: int | None = Field(default=None, alias="TRIAGE_CHAT_ID")
+    operator_thread_id: int | None = Field(default=None, alias="OPERATOR_THREAD_ID")
+    developer_thread_id: int | None = Field(default=None, alias="DEVELOPER_THREAD_ID")
+    documents_thread_id: int | None = Field(default=None, alias="DOCUMENTS_THREAD_ID")
+    bot_admin_thread_id: int | None = Field(default=None, alias="BOT_ADMIN_THREAD_ID")
+    triage_thread_id: int | None = Field(default=None, alias="TRIAGE_THREAD_ID")
 
     @field_validator("admin_chat_id", mode="before")
     @classmethod
@@ -64,14 +68,28 @@ class Settings(BaseSettings):
             return None
         return value
 
-    @field_validator("duty_contact", mode="before")
+    @field_validator("duty_contact", "mini_app_url", "mini_app_api_url", "mini_app_api_secret", mode="before")
     @classmethod
-    def empty_duty_contact_to_none(cls, value: object) -> object:
+    def empty_optional_text_to_none(cls, value: object) -> object:
         if value == "":
             return None
         return value
 
-    @field_validator("alert_chat_id", "alert_thread_id", mode="before")
+    @field_validator(
+        "alert_chat_id",
+        "alert_thread_id",
+        "operator_chat_id",
+        "developer_chat_id",
+        "documents_chat_id",
+        "bot_admin_chat_id",
+        "triage_chat_id",
+        "operator_thread_id",
+        "developer_thread_id",
+        "documents_thread_id",
+        "bot_admin_thread_id",
+        "triage_thread_id",
+        mode="before",
+    )
     @classmethod
     def empty_alert_ids_to_none(cls, value: object) -> object:
         if value == "":
