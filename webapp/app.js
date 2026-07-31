@@ -3,6 +3,7 @@ const tg = window.Telegram?.WebApp;
 const state = {
   page: "login",
   mode: "ai",
+  language: localStorage.getItem("kdbl-language") || "ru",
   user: null,
   activeTicketId: sessionStorage.getItem("kdbl-active-ticket-id") || "",
   seenMessageIds: new Set(),
@@ -24,6 +25,7 @@ const pages = {
 
 const elements = {
   sessionLabel: $("#sessionLabel"),
+  languageToggle: $("#languageToggle"),
   telegramLoginBox: $("#telegramLoginBox"),
   loginHint: $("#loginHint"),
   homeWorkButton: $("#homeWorkButton"),
@@ -63,6 +65,25 @@ const elements = {
   adminSendReplyButton: $("#adminSendReplyButton"),
 };
 
+const translations = {
+  ru: {
+    navMain: "Главная",
+    homeTitle: "Что открыть?",
+    homeText: "Для обычной работы создавайте обращения во вкладке Work. Админ-панель открывается отдельным логином и паролем.",
+    loginChecking: "Проверка входа",
+    loginRequired: "Требуется Telegram-вход",
+    loginPrefix: "Вход",
+  },
+  kz: {
+    navMain: "Басты",
+    homeTitle: "Не ашамыз?",
+    homeText: "Күнделікті жұмыс үшін Work бөлімінде өтініш жасаңыз. Admin panel бөлек логин және пароль арқылы ашылады.",
+    loginChecking: "Кіру тексерілуде",
+    loginRequired: "Telegram арқылы кіру керек",
+    loginPrefix: "Кіру",
+  },
+};
+
 window.onTelegramAuth = async (user) => {
   const response = await api("/api/auth/telegram", {
     method: "POST",
@@ -83,6 +104,7 @@ async function init() {
   tg?.expand();
   bindEvents();
   hydrateProfile();
+  applyLanguage();
   await loadSession();
   await renderTelegramLogin();
   setPage(state.user ? (location.hash.replace("#", "") || "main") : "login");
@@ -103,6 +125,7 @@ function bindEvents() {
   });
   elements.homeWorkButton.addEventListener("click", () => setPage("work"));
   elements.homeAdminButton.addEventListener("click", () => setPage("admin"));
+  elements.languageToggle.addEventListener("click", toggleLanguage);
   [elements.firstName, elements.lastName, elements.department].forEach((input) => {
     input.addEventListener("input", saveProfile);
   });
@@ -126,13 +149,34 @@ async function loadSession() {
   const response = await fetch(`/api/auth/session?${params}`, { credentials: "include" });
   if (!response.ok) {
     state.user = null;
-    elements.sessionLabel.textContent = "Требуется Telegram-вход";
+    elements.sessionLabel.textContent = t("loginRequired");
     return;
   }
   const data = await response.json();
   state.user = data.user;
   const name = [data.user?.firstName, data.user?.lastName].filter(Boolean).join(" ") || data.user?.username || data.user?.id;
-  elements.sessionLabel.textContent = `Вход: ${name}`;
+  elements.sessionLabel.textContent = `${t("loginPrefix")}: ${name}`;
+}
+
+function toggleLanguage() {
+  state.language = state.language === "ru" ? "kz" : "ru";
+  localStorage.setItem("kdbl-language", state.language);
+  applyLanguage();
+}
+
+function applyLanguage() {
+  document.documentElement.lang = state.language;
+  elements.languageToggle.textContent = state.language.toUpperCase();
+  document.querySelectorAll("[data-i18n]").forEach((node) => {
+    node.textContent = t(node.dataset.i18n);
+  });
+  if (!state.user) {
+    elements.sessionLabel.textContent = t("loginRequired");
+  }
+}
+
+function t(key) {
+  return translations[state.language]?.[key] || translations.ru[key] || key;
 }
 
 async function renderTelegramLogin() {

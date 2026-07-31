@@ -92,6 +92,26 @@ h2 {
   gap: 8px;
 }
 
+.top-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.icon-button {
+  display: grid;
+  min-width: 44px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--text);
+  background: var(--panel);
+  font-size: 13px;
+  font-weight: 900;
+}
+
 .tabs button,
 .segmented button,
 .panel-head button,
@@ -494,6 +514,11 @@ select:focus {
 
   .topbar {
     display: grid;
+  }
+
+  .top-actions {
+    display: grid;
+    grid-template-columns: auto 1fr;
   }
 
   .tabs {

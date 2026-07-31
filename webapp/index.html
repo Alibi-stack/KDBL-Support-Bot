@@ -17,11 +17,14 @@
           <strong id="sessionLabel">Проверка входа</strong>
         </div>
       </div>
-      <nav class="tabs" aria-label="Навигация">
-        <button data-page="main" type="button">Главная</button>
-        <button data-page="work" type="button">Work</button>
-        <button data-page="admin" type="button">Admin</button>
-      </nav>
+      <div class="top-actions">
+        <button id="languageToggle" class="icon-button" type="button" title="Сменить язык">RU</button>
+        <nav class="tabs" aria-label="Навигация">
+          <button data-page="main" type="button" data-i18n="navMain">Главная</button>
+          <button data-page="work" type="button">Work</button>
+          <button data-page="admin" type="button">Admin</button>
+        </nav>
+      </div>
     </header>
 
     <section id="loginPage" class="page auth-page">
@@ -36,8 +39,8 @@
     <section id="mainPage" class="page" hidden>
       <section class="home-panel">
         <div>
-          <h1>Что открыть?</h1>
-          <p>Для обычной работы создавайте обращения во вкладке Work. Админ-панель открывается отдельным логином и паролем.</p>
+          <h1 data-i18n="homeTitle">Что открыть?</h1>
+          <p data-i18n="homeText">Для обычной работы создавайте обращения во вкладке Work. Админ-панель открывается отдельным логином и паролем.</p>
         </div>
         <div class="home-actions">
           <button id="homeWorkButton" class="primary-button" type="button">Work</button>
