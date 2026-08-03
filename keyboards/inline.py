@@ -193,7 +193,7 @@ def ticket_claim_keyboard(ticket_id: int) -> InlineKeyboardMarkup:
             ],
             [
                 InlineKeyboardButton(
-                    text="РњР°СЂС€СЂСѓС‚",
+                    text="Маршрут",
                     callback_data=f"ticket_route_menu:{ticket_id}",
                 ),
             ]
