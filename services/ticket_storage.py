@@ -131,6 +131,16 @@ CREATE TABLE IF NOT EXISTS app_state (
     value TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
+
+ALTER TABLE tickets ADD COLUMN IF NOT EXISTS department TEXT NOT NULL DEFAULT 'unknown';
+ALTER TABLE tickets ADD COLUMN IF NOT EXISTS routing_status TEXT NOT NULL DEFAULT 'needs_review';
+ALTER TABLE tickets ADD COLUMN IF NOT EXISTS routing_confidence INTEGER;
+ALTER TABLE tickets ADD COLUMN IF NOT EXISTS routing_reason TEXT;
+ALTER TABLE tickets ADD COLUMN IF NOT EXISTS clarification_question TEXT;
+ALTER TABLE tickets ADD COLUMN IF NOT EXISTS clarification_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE tickets ADD COLUMN IF NOT EXISTS initial_department TEXT;
+ALTER TABLE tickets ADD COLUMN IF NOT EXISTS final_department TEXT;
+ALTER TABLE tickets ADD COLUMN IF NOT EXISTS routed_at TEXT;
 """
 
 _pool: asyncpg.Pool | None = None

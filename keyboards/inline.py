@@ -193,10 +193,10 @@ def ticket_claim_keyboard(ticket_id: int) -> InlineKeyboardMarkup:
             ],
             [
                 InlineKeyboardButton(
-                    text="РњР°СЂС€СЂСѓС‚",
+                    text="Маршрут",
                     callback_data=f"ticket_route_menu:{ticket_id}",
                 ),
-            ]
+            ],
         ]
     )
 
@@ -256,4 +256,3 @@ def ticket_open_keyboard(ticket_id: int, topic_url: str | None) -> InlineKeyboar
         ]
     )
     return InlineKeyboardMarkup(inline_keyboard=buttons)
-

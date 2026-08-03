@@ -96,6 +96,26 @@ PHONEBOOK_RESPONSES = {
 }
 
 
+def get_last_ai_question(data: dict) -> str | None:
+    last_question = data.get("last_question")
+    if isinstance(last_question, str) and last_question.strip():
+        return last_question.strip()
+
+    history = data.get("ai_history")
+    if not isinstance(history, list):
+        return None
+
+    for item in reversed(history):
+        if not isinstance(item, dict):
+            continue
+        if item.get("role") != "user":
+            continue
+        content = item.get("content")
+        if isinstance(content, str) and content.strip():
+            return content.strip()
+    return None
+
+
 @router.callback_query(F.data == "human_support")
 async def ask_support_question(callback: CallbackQuery, state: FSMContext) -> None:
     user = callback.from_user
@@ -125,19 +145,23 @@ async def ask_support_question(callback: CallbackQuery, state: FSMContext) -> No
         return
 
     data = await state.get_data()
-    last_question = data.get("last_question")
-    await state.set_state(UserDialog.waiting_support_question)
+    last_question = get_last_ai_question(data)
 
     if last_question:
+        await callback.answer("Создаю обращение...")
+        await callback.message.answer(
+            "Создаю обращение оператору...\n"
+            "Операторға өтініш жасалып жатыр..."
+        )
         await create_support_ticket(
             callback.message,
             state,
             last_question,
             user_override=callback.from_user,
         )
-        await callback.answer("Обращение создано / Өтініш құрылды")
         return
 
+    await state.set_state(UserDialog.waiting_support_question)
     await callback.message.answer(
         "Опишите проблему для оператора одним текстовым сообщением.\n"
         "Операторға мәселеңізді бір мәтіндік хабарламада жазыңыз.",
@@ -982,19 +1006,36 @@ async def create_support_ticket(
             routing_error_type=routing.error_type,
         )
 
-        admin_message = await message.bot.send_message(
-            target_chat_id,
-            build_general_ticket_text(
-                ticket.id,
-                user_id,
-                user_name,
-                username,
-                question,
-                routing=routing,
-            ),
-            reply_markup=ticket_claim_keyboard(ticket.id),
-            message_thread_id=target_thread_id,
+        admin_text = build_general_ticket_text(
+            ticket.id,
+            user_id,
+            user_name,
+            username,
+            question,
+            routing=routing,
         )
+        try:
+            admin_message = await message.bot.send_message(
+                target_chat_id,
+                admin_text,
+                reply_markup=ticket_claim_keyboard(ticket.id),
+                message_thread_id=target_thread_id,
+            )
+        except TelegramBadRequest:
+            logger.exception(
+                "Cannot send new ticket to configured topic; falling back to General",
+                extra={
+                    "ticket_id": ticket.id,
+                    "chat_id": target_chat_id,
+                    "thread_id": target_thread_id,
+                    "department": routing.department,
+                },
+            )
+            admin_message = await message.bot.send_message(
+                target_chat_id,
+                admin_text,
+                reply_markup=ticket_claim_keyboard(ticket.id),
+            )
         await set_ticket_admin_message(ticket.id, admin_message.message_id)
     except Exception:
         logger.exception("Cannot create support ticket")
