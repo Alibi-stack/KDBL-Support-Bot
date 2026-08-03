@@ -81,6 +81,21 @@
         }
       ],
       "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] }
+    },
+    {
+      "id": 5,
+      "title": "Telegram 429 (Too Many Requests) в минуту",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "prometheus-kdbl" },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-kdbl" },
+          "expr": "rate(kdbl_telegram_rate_limited_total[1m]) * 60",
+          "legendFormat": "429/мин"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] }
     }
   ]
 }

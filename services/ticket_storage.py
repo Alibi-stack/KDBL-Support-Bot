@@ -25,6 +25,15 @@ class Ticket:
     admin_chat_id: int | None
     admin_message_id: int | None
     admin_thread_id: int | None
+    department: str
+    routing_status: str
+    routing_confidence: int | None
+    routing_reason: str | None
+    clarification_question: str | None
+    clarification_count: int
+    initial_department: str | None
+    final_department: str | None
+    routed_at: str | None
 
 
 @dataclass(frozen=True)
@@ -54,6 +63,15 @@ CREATE TABLE IF NOT EXISTS tickets (
     admin_chat_id BIGINT,
     admin_message_id BIGINT,
     admin_thread_id BIGINT,
+    department TEXT NOT NULL DEFAULT 'unknown',
+    routing_status TEXT NOT NULL DEFAULT 'needs_review',
+    routing_confidence INTEGER,
+    routing_reason TEXT,
+    clarification_question TEXT,
+    clarification_count INTEGER NOT NULL DEFAULT 0,
+    initial_department TEXT,
+    final_department TEXT,
+    routed_at TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     closed_at TEXT
@@ -71,6 +89,28 @@ CREATE TABLE IF NOT EXISTS ticket_messages (
     text TEXT NOT NULL,
     created_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS ticket_routing_history (
+    id SERIAL PRIMARY KEY,
+    ticket_id INTEGER NOT NULL REFERENCES tickets(id),
+    event_type TEXT NOT NULL,
+    from_department TEXT,
+    to_department TEXT NOT NULL,
+    routing_status TEXT NOT NULL,
+    confidence INTEGER,
+    reason TEXT,
+    clarification_question TEXT,
+    actor_id BIGINT,
+    actor_name TEXT,
+    llm_model TEXT,
+    duration_ms INTEGER,
+    success BOOLEAN NOT NULL DEFAULT TRUE,
+    error_type TEXT,
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_ticket_routing_history_ticket_id
+    ON ticket_routing_history(ticket_id, id);
 
 CREATE TABLE IF NOT EXISTS user_settings (
     user_id BIGINT PRIMARY KEY,
@@ -126,6 +166,15 @@ def _row_to_ticket(row: asyncpg.Record | None) -> Ticket | None:
         admin_chat_id=row["admin_chat_id"],
         admin_message_id=row["admin_message_id"],
         admin_thread_id=row["admin_thread_id"],
+        department=row["department"],
+        routing_status=row["routing_status"],
+        routing_confidence=row["routing_confidence"],
+        routing_reason=row["routing_reason"],
+        clarification_question=row["clarification_question"],
+        clarification_count=row["clarification_count"],
+        initial_department=row["initial_department"],
+        final_department=row["final_department"],
+        routed_at=row["routed_at"],
     )
 
 
@@ -141,6 +190,18 @@ async def create_ticket(
     username: str | None,
     question: str,
     admin_chat_id: int,
+    department: str = "unknown",
+    routing_status: str = "needs_review",
+    routing_confidence: int | None = None,
+    routing_reason: str | None = None,
+    clarification_question: str | None = None,
+    clarification_count: int = 0,
+    initial_department: str | None = None,
+    final_department: str | None = None,
+    llm_model: str | None = None,
+    routing_duration_ms: int | None = None,
+    routing_success: bool = True,
+    routing_error_type: str | None = None,
 ) -> Ticket:
     now = _now()
     pool = await _get_pool()
@@ -149,9 +210,11 @@ async def create_ticket(
             """
             INSERT INTO tickets (
                 user_id, user_name, username, question, status,
-                admin_chat_id, created_at, updated_at
+                admin_chat_id, department, routing_status, routing_confidence,
+                routing_reason, clarification_question, clarification_count,
+                initial_department, final_department, routed_at, created_at, updated_at
             )
-            VALUES ($1, $2, $3, $4, 'open', $5, $6, $6)
+            VALUES ($1, $2, $3, $4, 'open', $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $14, $14)
             RETURNING id
             """,
             user_id,
@@ -159,6 +222,14 @@ async def create_ticket(
             username,
             question,
             admin_chat_id,
+            department,
+            routing_status,
+            routing_confidence,
+            routing_reason,
+            clarification_question,
+            clarification_count,
+            initial_department or department,
+            final_department or department,
             now,
         )
         await connection.execute(
@@ -172,6 +243,27 @@ async def create_ticket(
             user_id,
             user_name,
             question,
+            now,
+        )
+        await connection.execute(
+            """
+            INSERT INTO ticket_routing_history (
+                ticket_id, event_type, from_department, to_department,
+                routing_status, confidence, reason, clarification_question,
+                llm_model, duration_ms, success, error_type, created_at
+            )
+            VALUES ($1, 'auto_classified', NULL, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            """,
+            ticket_id,
+            department,
+            routing_status,
+            routing_confidence,
+            routing_reason,
+            clarification_question,
+            llm_model,
+            routing_duration_ms,
+            routing_success,
+            routing_error_type,
             now,
         )
         row = await connection.fetchrow(
@@ -299,6 +391,62 @@ async def release_ticket(ticket_id: int) -> Ticket | None:
         operator_id=None,
         operator_name=None,
     )
+
+
+async def reassign_ticket_route(
+    ticket_id: int,
+    department: str,
+    actor_id: int | None,
+    actor_name: str | None,
+    admin_chat_id: int | None = None,
+    admin_thread_id: int | None = None,
+    reason: str = "Manual reassignment by operator.",
+) -> Ticket | None:
+    now = _now()
+    pool = await _get_pool()
+    async with pool.acquire() as connection, connection.transaction():
+        old_department = await connection.fetchval(
+            "SELECT department FROM tickets WHERE id = $1",
+            ticket_id,
+        )
+        await connection.execute(
+            """
+            UPDATE tickets
+            SET department = $1,
+                final_department = $1,
+                routing_status = 'manually_reassigned',
+                routing_reason = $2,
+                admin_chat_id = COALESCE($3, admin_chat_id),
+                admin_thread_id = $4,
+                updated_at = $5
+            WHERE id = $6
+            """,
+            department,
+            reason,
+            admin_chat_id,
+            admin_thread_id,
+            now,
+            ticket_id,
+        )
+        await connection.execute(
+            """
+            INSERT INTO ticket_routing_history (
+                ticket_id, event_type, from_department, to_department,
+                routing_status, confidence, reason, actor_id, actor_name,
+                created_at
+            )
+            VALUES ($1, 'manual_reassigned', $2, $3, 'manually_reassigned', NULL, $4, $5, $6, $7)
+            """,
+            ticket_id,
+            old_department,
+            department,
+            reason,
+            actor_id,
+            actor_name,
+            now,
+        )
+        row = await connection.fetchrow("SELECT * FROM tickets WHERE id = $1", ticket_id)
+    return _row_to_ticket(row)
 
 
 async def close_ticket(ticket_id: int) -> Ticket | None:

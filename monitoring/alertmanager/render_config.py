@@ -22,16 +22,11 @@ message_thread_id для Telegram-получателя).
 import os
 import sys
 
-from services.env_crypto import decrypt_env_value
-
 OUTPUT_PATH = "/etc/alertmanager/alertmanager.yml"
 
 
 def main() -> None:
-    secret_key = os.environ.get("ENV_SECRET_KEY", "").strip()
-    bot_token = str(
-        decrypt_env_value(os.environ.get("BOT_TOKEN", "").strip(), secret_key)
-    ).strip()
+    bot_token = os.environ.get("BOT_TOKEN", "").strip()
     chat_id = (os.environ.get("ALERT_CHAT_ID") or os.environ.get("ADMIN_CHAT_ID") or "").strip()
     thread_id = os.environ.get("ALERT_THREAD_ID", "").strip()
 

@@ -11,6 +11,7 @@ from aiogram.types import CallbackQuery, Message, ReplyKeyboardRemove
 from keyboards.inline import after_ai_keyboard, main_menu_keyboard
 from keyboards.reply import cancel_keyboard
 from handlers.start import is_work_time
+from services import metrics
 from services.ai_client import AIServiceError, get_ai_response
 from services.i18n import get_message_language, pick
 from services.operator_intent import build_operator_ticket_question, is_operator_request
@@ -63,6 +64,7 @@ async def cancel_dialog(message: Message, state: FSMContext) -> None:
 
 @router.message(UserDialog.waiting_question, F.text)
 async def handle_ai_question(message: Message, state: FSMContext) -> None:
+    metrics.messages_total.labels(type="ai").inc()
     language = await get_message_language(message)
     data = await state.get_data()
     history = data.get("ai_history", [])

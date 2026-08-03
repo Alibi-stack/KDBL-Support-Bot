@@ -7,6 +7,8 @@ __pycache__/
 *.pyc
 *.log
 chroma_store/
+.wrangler/
+deploy/*.zip
 
 # Docker/Compose-локальные данные (сами данные живут в named volumes
 # Docker, а не в репозитории; сюда попадёт только если кто-то по ошибке
@@ -16,3 +18,4 @@ chroma_data/
 prometheus_data/
 grafana_data/
 superset_home/
+.DS_Store

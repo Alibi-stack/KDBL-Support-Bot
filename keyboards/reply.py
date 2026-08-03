@@ -1,4 +1,4 @@
-from aiogram.types import KeyboardButton, ReplyKeyboardMarkup
+from aiogram.types import KeyboardButton, ReplyKeyboardMarkup, WebAppInfo
 
 
 def cancel_keyboard() -> ReplyKeyboardMarkup:
@@ -7,4 +7,21 @@ def cancel_keyboard() -> ReplyKeyboardMarkup:
         resize_keyboard=True,
         one_time_keyboard=True,
         input_field_placeholder="Напишите вопрос или нажмите Отмена",
+    )
+
+
+def mini_app_launch_keyboard(mini_app_url: str) -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [
+                KeyboardButton(
+                    text="Открыть KDBL Mini App",
+                    web_app=WebAppInfo(url=mini_app_url),
+                )
+            ],
+            [KeyboardButton(text="Сменить язык / Тілді ауыстыру")],
+        ],
+        resize_keyboard=True,
+        one_time_keyboard=False,
+        input_field_placeholder="Откройте Mini App кнопкой ниже",
     )
