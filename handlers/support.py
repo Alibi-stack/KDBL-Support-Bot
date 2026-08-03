@@ -162,6 +162,13 @@ async def take_app_ticket(callback: CallbackQuery) -> None:
 
     remember_app_ticket_thread(callback.message, ticket_id)
     await update_mini_app_ticket_status(ticket_id, "in_progress")
+    log_event(
+        "ticket_assigned",
+        source="mini_app",
+        ticket_id=ticket_id,
+        operator_id=user.id,
+        operator_name=user.full_name,
+    )
     ticket_text = mark_app_ticket_status(callback.message.text or "", "in_progress")
     await callback.message.edit_text(
         ticket_text or (callback.message.text or ""),
@@ -188,6 +195,13 @@ async def close_app_ticket(callback: CallbackQuery) -> None:
 
     remember_app_ticket_thread(callback.message, ticket_id)
     await update_mini_app_ticket_status(ticket_id, "closed", user.full_name)
+    log_event(
+        "ticket_closed",
+        source="mini_app",
+        ticket_id=ticket_id,
+        closed_by_id=user.id,
+        closed_by_name=user.full_name,
+    )
     ticket_text = mark_app_ticket_status(callback.message.text or "", "closed")
     await callback.message.edit_text(ticket_text or (callback.message.text or ""), reply_markup=None)
     await callback.message.answer(
@@ -1121,6 +1135,7 @@ async def bridge_operator_text_to_mini_app(
 
     operator = message.from_user
     operator_name = operator.full_name if operator else "Оператор"
+    operator_id = operator.id if operator else message.chat.id
     try:
         await post_mini_app_operator_message(
             settings.mini_app_api_url,
@@ -1134,6 +1149,14 @@ async def bridge_operator_text_to_mini_app(
         await message.answer("Не удалось отправить ответ в Mini App.")
         return
 
+    log_event(
+        "operator_message",
+        source="mini_app",
+        ticket_id=app_ticket_id,
+        operator_id=operator_id,
+        operator_name=operator_name,
+        message_type="text",
+    )
     await message.answer("Ответ отправлен в Mini App.")
 
 
